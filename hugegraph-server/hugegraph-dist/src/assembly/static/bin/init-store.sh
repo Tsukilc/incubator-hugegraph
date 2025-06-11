@@ -46,11 +46,30 @@ fi
 cd "${TOP}" || exit
 
 DEFAULT_JAVA_OPTIONS=""
-JAVA_VERSION=$($JAVA -version 2>&1 | awk 'NR==1{gsub(/"/,""); print $3}' | awk -F'_' '{print $1}')
-# TODO: better not string number compare, use `bc` like github.com/koalaman/shellcheck/wiki/SC2072
-if [[ $? -eq 0 && $JAVA_VERSION >  "1.9" ]]; then
-      DEFAULT_JAVA_OPTIONS="--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED"
+# Extract full Java version string (e.g., "11.0.12" or "1.8.0_292")
+FULL_JAVA_VERSION=$($JAVA -version 2>&1 | awk -F '"' '/version/ {print $2}')
+# Extract major version
+if [[ "$FULL_JAVA_VERSION" =~ ^1\. ]]; then
+  MAJOR_VERSION=$(echo "$FULL_JAVA_VERSION" | awk -F'.' '{print $2}')
+else
+  MAJOR_VERSION=$(echo "$FULL_JAVA_VERSION" | awk -F'.' '{print $1}')
 fi
+
+MIN_REQUIRED_VERSION=11
+
+if [[ "$MAJOR_VERSION" -lt "$MIN_REQUIRED_VERSION" ]]; then
+  echo "Error: Java $MIN_REQUIRED_VERSION or higher is required to run init-store.sh. Found Java $FULL_JAVA_VERSION." >&2
+  exit 1
+fi
+
+# Options for Java 9+ (includes Java 11)
+# These options are generally safe for Java 11 and might still be needed for certain dependencies.
+if [[ "$MAJOR_VERSION" -ge 9 ]]; then
+  DEFAULT_JAVA_OPTIONS="--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED"
+  # Add other Java 9+ specific options if there were any more here
+fi
+
+echo "Using Java version: $FULL_JAVA_VERSION"
 
 echo "Initializing HugeGraph Store..."
 
