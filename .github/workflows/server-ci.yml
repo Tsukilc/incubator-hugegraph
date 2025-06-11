@@ -36,6 +36,10 @@ jobs:
         with:
           fetch-depth: 5
 
+      # FIXME: The following step uses Java 8 specifically for installing HBase 2.0.2,
+      # which is not compatible with Java 11. To fully transition this CI to Java 11,
+      # HBase needs to be upgraded to a Java 11 compatible version (e.g., 2.3.x or later).
+      # This is a known issue and should be addressed as a follow-up task.
       # TODO: Remove this step after install-backend.sh updated
       - name: Install Java8 for backend
         uses: actions/setup-java@v4

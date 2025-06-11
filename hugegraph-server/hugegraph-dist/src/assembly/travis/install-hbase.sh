@@ -1,4 +1,9 @@
 #!/bin/bash
+# FIXME: This script installs HBase 2.0.2, which requires Java 8.
+# To make the CI environment fully Java 11 compatible, this script
+# needs to be updated to install a newer version of HBase (e.g., 2.3.x or later)
+# that supports Java 11. This change should be coordinated with updates
+# to the HBase client dependencies and thorough testing.
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
