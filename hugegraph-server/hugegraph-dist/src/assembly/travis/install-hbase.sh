@@ -23,6 +23,8 @@
 set -ev
 
 TRAVIS_DIR=$(dirname $0)
+CI_HBASE_LOG_DIR="$HOME/hbase_ci_logs"
+echo "HBase CI log directory set to: ${CI_HBASE_LOG_DIR}"
 HBASE_DOWNLOAD_ADDRESS="https://archive.apache.org/dist/hbase"
 HBASE_VERSION="2.5.8"
 HBASE_PACKAGE="hbase-${HBASE_VERSION}"
@@ -59,6 +61,8 @@ sudo chown -R "$(whoami)" "$ZK_DATA_DIR" || echo "Chown failed, proceeding with 
 echo "Created ZooKeeper data directory."
 
 # start hbase service
+mkdir -p "${CI_HBASE_LOG_DIR}"
+echo "Ensured HBase CI log directory exists: ${CI_HBASE_LOG_DIR}"
 echo "Current JAVA_HOME before starting HBase: $JAVA_HOME"
 echo "Forcing JAVA_HOME for HBase startup. Assuming the CI step for Java 8 setup has correctly set JAVA_HOME."
 # Ensure that if JAVA_HOME is not set, we don't just pass an empty string.
@@ -67,4 +71,19 @@ if [ -z "$JAVA_HOME" ]; then
     echo "Error: JAVA_HOME is not set prior to starting HBase. Cannot force Java 8." >&2
     exit 1 # Or handle error as appropriate
 fi
-sudo "JAVA_HOME=${JAVA_HOME}" "${HBASE_PACKAGE}/bin/start-hbase.sh"
+sudo "JAVA_HOME=${JAVA_HOME}" "HBASE_LOG_DIR=${CI_HBASE_LOG_DIR}" "${HBASE_PACKAGE}/bin/start-hbase.sh"
+
+echo "Sleeping for 30 seconds to allow HBase to attempt startup and generate logs..."
+sleep 30
+
+echo "Listing HBase log directory: ${CI_HBASE_LOG_DIR}"
+ls -lR "${CI_HBASE_LOG_DIR}" || echo "Could not list HBase log directory: ${CI_HBASE_LOG_DIR}"
+
+echo "Printing .log and .out files from ${CI_HBASE_LOG_DIR}:"
+# Use a loop that's robust to spaces in filenames, though not expected here.
+find "${CI_HBASE_LOG_DIR}" -type f \( -name "*.log" -o -name "*.out" \) -print0 | while IFS= read -r -d $'\0' file; do
+    echo ">>>> Contents of ${file} <<<<"
+    cat "${file}" || echo "Failed to cat ${file}"
+    echo ">>>> End of ${file} <<<<"
+done
+echo "Finished printing HBase logs."
