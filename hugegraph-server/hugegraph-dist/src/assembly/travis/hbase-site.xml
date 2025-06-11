@@ -22,6 +22,10 @@
         <value>/tmp/hbase</value>
     </property>
     <property>
+        <name>hbase.cluster.distributed</name>
+        <value>false</value>
+    </property>
+    <property>
         <name>hbase.zookeeper.property.dataDir</name>
         <value>/tmp/zookeeper</value>
     </property>

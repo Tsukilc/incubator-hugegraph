@@ -44,5 +44,19 @@ sudo ln -s /mnt/ramdisk /tmp/hbase
 # config hbase
 sudo cp -f $TRAVIS_DIR/hbase-site.xml ${HBASE_PACKAGE}/conf
 
+ZK_DATA_DIR=/tmp/zookeeper # As defined in hbase-site.xml
+echo "Preparing ZooKeeper data directory: $ZK_DATA_DIR"
+if [ -d "$ZK_DATA_DIR" ]; then
+    sudo rm -rf "$ZK_DATA_DIR"
+    echo "Removed existing ZooKeeper data directory."
+fi
+sudo mkdir -p "$ZK_DATA_DIR"
+# Attempt to chown to the current user.
+# If start-hbase.sh is run as root via sudo, HBase/ZK itself will manage permissions.
+# If it's run as a non-root user (even after sudo), this helps ensure the non-root user can write.
+# This might need adjustment based on the exact user running the HBase process in CI.
+sudo chown -R "$(whoami)" "$ZK_DATA_DIR" || echo "Chown failed, proceeding with default permissions for $ZK_DATA_DIR"
+echo "Created ZooKeeper data directory."
+
 # start hbase service
 sudo ${HBASE_PACKAGE}/bin/start-hbase.sh
