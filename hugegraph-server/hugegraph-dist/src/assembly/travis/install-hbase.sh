@@ -59,4 +59,12 @@ sudo chown -R "$(whoami)" "$ZK_DATA_DIR" || echo "Chown failed, proceeding with 
 echo "Created ZooKeeper data directory."
 
 # start hbase service
-sudo ${HBASE_PACKAGE}/bin/start-hbase.sh
+echo "Current JAVA_HOME before starting HBase: $JAVA_HOME"
+echo "Forcing JAVA_HOME for HBase startup. Assuming the CI step for Java 8 setup has correctly set JAVA_HOME."
+# Ensure that if JAVA_HOME is not set, we don't just pass an empty string.
+# However, the CI step 'Install Java8 for backend' should have set it.
+if [ -z "$JAVA_HOME" ]; then
+    echo "Error: JAVA_HOME is not set prior to starting HBase. Cannot force Java 8." >&2
+    exit 1 # Or handle error as appropriate
+fi
+sudo "JAVA_HOME=${JAVA_HOME}" "${HBASE_PACKAGE}/bin/start-hbase.sh"
