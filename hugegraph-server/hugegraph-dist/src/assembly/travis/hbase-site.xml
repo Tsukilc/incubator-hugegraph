@@ -34,6 +34,10 @@
         <value>127.0.0.1</value>
     </property>
     <property>
+        <name>hbase.zookeeper.property.clientPortAddress</name>
+        <value>127.0.0.1</value>
+    </property>
+    <property>
         <name>hbase.zookeeper.property.maxClientCnxns</name>
         <value>0</value>
     </property>
