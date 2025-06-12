@@ -65,6 +65,18 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
 
     private final ConcurrentHashMap<Id, HugeTask<?>> runningTasks = new ConcurrentHashMap<>();
 
+    /**
+     * 分布式任务调度器构造函数
+     * 
+     * @param graph 图参数，包含配置信息
+     * @param schedulerExecutor 调度器线程池，用于定时任务
+     * @param taskDbExecutor 任务数据库操作线程池
+     * @param schemaTaskExecutor Schema操作任务专用线程池
+     * @param olapTaskExecutor OLAP计算任务专用线程池  
+     * @param gremlinTaskExecutor Gremlin查询任务专用线程池
+     * @param ephemeralTaskExecutor 临时任务专用线程池
+     * @param serverInfoDbExecutor 服务器信息数据库操作线程池
+     */
     public DistributedTaskScheduler(HugeGraphParams graph,
                                     ScheduledThreadPoolExecutor schedulerExecutor,
                                     ExecutorService taskDbExecutor,
@@ -73,40 +85,56 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
                                     ExecutorService gremlinTaskExecutor,
                                     ExecutorService ephemeralTaskExecutor,
                                     ExecutorService serverInfoDbExecutor) {
+        // 调用父类构造函数，初始化基础功能
         super(graph, serverInfoDbExecutor);
 
+        // === 初始化各种类型的线程池 ===
+        // 任务数据库操作线程池：用于任务的持久化操作
         this.taskDbExecutor = taskDbExecutor;
+        // Schema任务线程池：处理图模式相关的任务
         this.schemaTaskExecutor = schemaTaskExecutor;
+        // OLAP任务线程池：处理大规模图计算任务
         this.olapTaskExecutor = olapTaskExecutor;
+        // Gremlin任务线程池：处理图查询任务
         this.gremlinTaskExecutor = gremlinTaskExecutor;
+        // 临时任务线程池：处理不需要持久化的轻量任务
         this.ephemeralTaskExecutor = ephemeralTaskExecutor;
 
+        // 调度器线程池：用于定时任务调度
         this.schedulerExecutor = schedulerExecutor;
 
+        // 设置调度器为开启状态
         this.closed.set(false);
 
+        // 从配置中获取调度周期
         this.schedulePeriod = this.graph.configuration()
                                         .get(CoreOptions.TASK_SCHEDULE_PERIOD);
 
+        // === 启动定时调度任务 ===
+        // 创建周期性任务，每隔schedulePeriod秒执行一次cronSchedule
         this.cronFuture = this.schedulerExecutor.scheduleWithFixedDelay(
             () -> {
                 // TODO: uncomment later - graph space
+                // 获取图级别的锁，防止多个调度器同时操作同一个图的任务
                 // LockUtil.lock(this.graph().spaceGraphName(), LockUtil.GRAPH_LOCK);
                 LockUtil.lock("", LockUtil.GRAPH_LOCK);
                 try {
                     // TODO: Use super administrator privileges to query tasks.
                     // TaskManager.useAdmin();
+                    // 执行核心调度逻辑
                     this.cronSchedule();
                 } catch (Throwable t) {
                     // TODO: log with graph space
+                    // 记录调度过程中的异常，但不影响后续调度
                     LOG.info("cronScheduler exception graph: {}", this.graphName(), t);
                 } finally {
                     // TODO: uncomment later - graph space
+                    // 无论成功还是失败都要释放锁
                     LockUtil.unlock("", LockUtil.GRAPH_LOCK);
                     // LockUtil.unlock(this.graph().spaceGraphName(), LockUtil.GRAPH_LOCK);
                 }
             },
-            10L, schedulePeriod,
+            10L, schedulePeriod, // 延迟10秒启动，然后每schedulePeriod秒执行一次
             TimeUnit.SECONDS);
     }
 
@@ -120,13 +148,20 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         }
     }
 
+    /**
+     * 定时调度方法：这是分布式任务调度的核心逻辑
+     * 每个节点定期执行此方法，扫描数据库中的任务并进行状态管理
+     */
     public void cronSchedule() {
         // Perform periodic scheduling tasks
 
+        // 前置检查：如果图实例未启动或已关闭，跳过调度
         if (!this.graph.started() || this.graph.closed()) {
             return;
         }
 
+        // === 第一阶段：处理NEW状态的任务 ===
+        // 扫描数据库中状态为NEW的任务，尝试启动执行
         // Handle tasks in NEW status
         Iterator<HugeTask<Object>> news = queryTaskWithoutResultByStatus(
             TaskStatus.NEW);
@@ -135,12 +170,15 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             HugeTask<?> newTask = news.next();
             LOG.info("Try to start task({})@({}/{})", newTask.id(),
                      this.graphSpace, this.graphName);
+            // 尝试启动任务，如果线程池满了会返回false
             if (!tryStartHugeTask(newTask)) {
                 // Task submission failed when the thread pool is full.
-                break;
+                break; // 线程池满了，停止处理更多任务
             }
         }
 
+        // === 第二阶段：处理RUNNING状态的任务 ===
+        // 检查运行中的任务是否还在正常执行，如果节点已释放锁则标记为失败
         // Handling tasks in RUNNING state
         Iterator<HugeTask<Object>> runnings =
             queryTaskWithoutResultByStatus(TaskStatus.RUNNING);
@@ -148,7 +186,9 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         while (!this.closed.get() && runnings.hasNext()) {
             HugeTask<?> running = runnings.next();
             initTaskParams(running);
+            // 检查任务是否还被当前节点锁定
             if (!isLockedTask(running.id().toString())) {
+                // 如果锁已释放，说明执行节点可能已故障，将任务标记为失败
                 LOG.info("Try to update task({})@({}/{}) status" +
                          "(RUNNING->FAILED)", running.id(), this.graphSpace,
                          this.graphName);
@@ -163,6 +203,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             }
         }
 
+        // === 第三阶段：处理FAILED状态的任务 ===
+        // 失败的任务如果还有重试次数，重新标记为NEW等待执行
         // Handle tasks in FAILED/HANGING state
         Iterator<HugeTask<Object>> faileds =
             queryTaskWithoutResultByStatus(TaskStatus.FAILED);
@@ -170,14 +212,18 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         while (!this.closed.get() && faileds.hasNext()) {
             HugeTask<?> failed = faileds.next();
             initTaskParams(failed);
+            // 检查重试次数是否超限
             if (failed.retries() < this.graph().option(CoreOptions.TASK_RETRY)) {
                 LOG.info("Try to update task({})@({}/{}) status(FAILED->NEW)",
                          failed.id(), this.graphSpace, this.graphName);
+                // 重置为NEW状态，等待重新执行
                 updateStatusWithLock(failed.id(), TaskStatus.FAILED,
                                      TaskStatus.NEW);
             }
         }
 
+        // === 第四阶段：处理CANCELLING状态的任务 ===
+        // 处理正在取消的任务
         // Handling tasks in CANCELLING state
         Iterator<HugeTask<Object>> cancellings = queryTaskWithoutResultByStatus(
             TaskStatus.CANCELLING);
@@ -185,6 +231,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         while (!this.closed.get() && cancellings.hasNext()) {
             Id cancellingId = cancellings.next().id();
             if (runningTasks.containsKey(cancellingId)) {
+                // 如果任务在本地运行，直接取消
                 HugeTask<?> cancelling = runningTasks.get(cancellingId);
                 initTaskParams(cancelling);
                 LOG.info("Try to cancel task({})@({}/{})",
@@ -193,6 +240,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
 
                 runningTasks.remove(cancellingId);
             } else {
+                // 本地没有执行该任务，但如果没有其他节点持有锁，直接标记为已取消
                 // Local no execution task, but the current task has no nodes executing.
                 if (!isLockedTask(cancellingId.toString())) {
                     updateStatusWithLock(cancellingId, TaskStatus.CANCELLING,
@@ -201,6 +249,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             }
         }
 
+        // === 第五阶段：处理DELETING状态的任务 ===
+        // 删除标记为删除的任务
         // Handling tasks in DELETING status
         Iterator<HugeTask<Object>> deletings = queryTaskWithoutResultByStatus(
             TaskStatus.DELETING);
@@ -208,6 +258,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         while (!this.closed.get() && deletings.hasNext()) {
             Id deletingId = deletings.next().id();
             if (runningTasks.containsKey(deletingId)) {
+                // 如果任务在本地运行，先取消再删除
                 HugeTask<?> deleting = runningTasks.get(deletingId);
                 initTaskParams(deleting);
                 deleting.cancel(true);
@@ -217,6 +268,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
 
                 runningTasks.remove(deletingId);
             } else {
+                // 本地没有执行该任务，如果没有其他节点持有锁，直接从数据库删除
                 // Local has no task execution, but the current task has no nodes executing anymore.
                 if (!isLockedTask(deletingId.toString())) {
                     deleteFromDB(deletingId);
@@ -249,22 +301,30 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
 
     @Override
     public <V> Future<?> schedule(HugeTask<V> task) {
+        // 1. 参数校验：确保任务不为空
         E.checkArgumentNotNull(task, "Task can't be null");
 
+        // 2. 初始化任务参数：绑定调度器、图实例等运行环境
         initTaskParams(task);
 
+        // 3. 特殊处理：临时任务(ephemeralTask)直接在本地执行，无需调度
+        // 临时任务通常是轻量级、快速执行的任务，不需要持久化和分布式调度
         if (task.ephemeralTask()) {
             // Handle ephemeral tasks, no scheduling needed, execute directly
             return this.ephemeralTaskExecutor.submit(task);
         }
 
+        // 4. 任务持久化：将任务保存到数据库，状态设置为 NEW
+        // 这样其他节点也能看到这个任务，是分布式调度的基础
         // Process schema task
         // Handle gremlin task
         // Handle OLAP calculation tasks
         // Add task to DB, current task status is NEW
-        // TODO: save server id for task
+        // TODO: save server id for task  // 注释：将来需要保存服务器ID，用于任务分配跟踪
         this.save(task);
 
+        // 5. 本地执行尝试：如果调度器未关闭，尝试在当前节点立即执行任务
+        // 这是一种优化策略：优先在创建任务的节点执行，避免不必要的调度延迟
         if (!this.closed.get()) {
             LOG.info("Try to start task({})@({}/{}) immediately", task.id(),
                      this.graphSpace, this.graphName);
@@ -273,17 +333,30 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             LOG.info("TaskScheduler has closed");
         }
 
+        // 6. 返回值：当前实现返回null，表示任务已提交但不提供Future跟踪
+        // 任务状态跟踪需要通过数据库查询实现
         return null;
     }
 
+    /**
+     * 初始化任务参数：为任务绑定执行所需的环境变量
+     * 这个方法在任务反序列化和执行前必须调用
+     */
     protected <V> void initTaskParams(HugeTask<V> task) {
         // Bind the environment variables required for the current task execution
         // Before task deserialization and execution, this method needs to be called.
+        
+        // 绑定任务调度器：让任务知道由哪个调度器管理
         task.scheduler(this);
+        
+        // 获取任务的可调用对象(实际执行逻辑)
         TaskCallable<V> callable = task.callable();
+        
+        // 为可调用对象绑定任务实例和图实例
         callable.task(task);
         callable.graph(this.graph());
 
+        // 特殊处理：如果是系统任务，需要绑定图参数
         if (callable instanceof TaskCallable.SysTaskCallable) {
             ((TaskCallable.SysTaskCallable<?>) callable).params(this.graph);
         }
@@ -507,47 +580,58 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
     }
 
     /**
-     * try to start task;
+     * 尝试启动HugeTask：这是任务执行的核心方法
+     * 根据任务类型选择合适的线程池，如果有可用资源则立即执行
      *
-     * @param task
-     * @return true if the task have start
+     * @param task 要执行的任务
+     * @return true 如果任务成功提交执行；false 如果线程池已满
      */
     private boolean tryStartHugeTask(HugeTask<?> task) {
         // Print Scheduler status
-        logCurrentState();
+        logCurrentState(); // 打印当前调度器状态，用于监控和调试
 
+        // 初始化任务参数
         initTaskParams(task);
 
-        ExecutorService chosenExecutor = gremlinTaskExecutor;
+        // === 选择执行器策略 ===
+        // 根据任务类型选择合适的线程池，实现任务隔离和资源管理
+        ExecutorService chosenExecutor = gremlinTaskExecutor; // 默认使用gremlin执行器
 
+        // OLAP计算任务：使用专门的OLAP线程池，通常资源更多
         if (task.computer()) {
             chosenExecutor = this.olapTaskExecutor;
         }
 
         // TODO: uncomment later - vermeer job
+        // Vermeer任务：未来支持的分布式图计算框架
         //if (task.vermeer()) {
         //    chosenExecutor = this.olapTaskExecutor;
         //}
 
+        // Gremlin查询任务：使用Gremlin专用线程池
         if (task.gremlinTask()) {
             chosenExecutor = this.gremlinTaskExecutor;
         }
 
+        // Schema操作任务：使用Schema专用线程池，避免影响其他操作
         if (task.schemaTask()) {
             chosenExecutor = schemaTaskExecutor;
         }
 
+        // === 资源检查和任务提交 ===
+        // 检查选定的线程池是否有可用资源
         ThreadPoolExecutor executor = (ThreadPoolExecutor) chosenExecutor;
         if (executor.getActiveCount() < executor.getMaximumPoolSize()) {
+            // 有可用资源，创建任务运行器并提交执行
             TaskRunner<?> runner = new TaskRunner<>(task);
             chosenExecutor.submit(runner);
             LOG.info("Submit task({})@({}/{})", task.id(),
                      this.graphSpace, this.graphName);
 
-            return true;
+            return true; // 任务成功提交
         }
 
-        return false;
+        return false; // 线程池已满，任务未能提交
     }
 
     protected void logCurrentState() {
@@ -565,11 +649,18 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
                  gremlinActive, schemaActive, ephemeralActive, olapActive);
     }
 
+    /**
+     * 尝试锁定任务：在分布式环境中确保任务只在一个节点执行
+     * 
+     * @param taskId 任务ID
+     * @return 锁结果对象，包含是否成功获取锁等信息
+     */
     private LockResult tryLockTask(String taskId) {
 
         LockResult lockResult = new LockResult();
 
         try {
+            // 通过MetaManager获取分布式锁，防止同一任务在多个节点同时执行
             lockResult =
                 MetaManager.instance().tryLockTask(graphSpace, graphName,
                                                    taskId);
@@ -580,9 +671,16 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         return lockResult;
     }
 
+    /**
+     * 释放任务锁：任务执行完成或失败后释放锁，允许其他操作
+     * 
+     * @param taskId 任务ID
+     * @param lockResult 之前获取锁时返回的结果对象
+     */
     private void unlockTask(String taskId, LockResult lockResult) {
 
         try {
+            // 释放之前获取的分布式锁
             MetaManager.instance().unlockTask(graphSpace, graphName, taskId,
                                               lockResult);
         } catch (Throwable t) {
@@ -591,11 +689,22 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         }
     }
 
+    /**
+     * 检查任务是否被锁定：用于判断任务是否正在其他节点执行
+     * 
+     * @param taskId 任务ID
+     * @return true 如果任务被锁定；false 如果任务未被锁定
+     */
     private boolean isLockedTask(String taskId) {
+        // 查询任务是否在分布式环境中被某个节点锁定
         return MetaManager.instance().isLockedTask(graphSpace,
                                                    graphName, taskId);
     }
 
+    /**
+     * 任务运行器：包装实际的任务执行逻辑
+     * 负责任务的生命周期管理、锁管理、异常处理等
+     */
     private class TaskRunner<V> implements Runnable {
 
         private final HugeTask<V> task;
@@ -606,37 +715,60 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
 
         @Override
         public void run() {
+            // === 第一步：尝试获取任务锁 ===
+            // 使用分布式锁确保同一任务只在一个节点执行
             LockResult lockResult = tryLockTask(task.id().asString());
 
+            // 重新初始化任务参数（因为可能跨线程传递）
             initTaskParams(task);
+            
+            // === 第二步：检查锁获取结果和任务状态 ===
             if (lockResult.lockSuccess() && !task.completed()) {
 
                 LOG.info("Start task({})", task.id());
 
+                // 设置任务上下文到当前线程
                 TaskManager.setContext(task.context());
                 try {
+                    // === 第三步：二次状态检查（防止并发问题） ===
                     // 1. start task can be from schedule() & cronSchedule()
                     // 2. recheck the status of task, in case one same task
                     // called by both methods at same time;
+                    
+                    // 从数据库重新查询任务状态，确保状态一致性
                     HugeTask<Object> queryTask = task(this.task.id());
                     if (queryTask != null &&
                         !TaskStatus.NEW.equals(queryTask.status())) {
+                        // 任务状态已变更，可能被其他节点处理了，直接返回
                         return;
                     }
 
+                    // === 第四步：标记任务为运行中 ===
+                    // 将任务添加到本地运行任务列表，用于状态跟踪
                     runningTasks.put(task.id(), task);
 
+                    // === 第五步：执行任务 ===
                     // Task execution will not throw exceptions, HugeTask will catch exceptions during execution and store them in the DB.
+                    // 任务执行不会抛出异常，HugeTask会捕获执行过程中的异常并存储到数据库
                     task.run();
                 } catch (Throwable t) {
+                    // === 异常处理 ===
+                    // 记录执行过程中的异常（虽然正常情况下task.run()不应该抛异常）
                     LOG.warn("exception when execute task", t);
                 } finally {
+                    // === 第六步：清理资源 ===
+                    // 无论执行成功还是失败，都要进行清理
+                    
+                    // 从本地运行列表中移除任务
                     runningTasks.remove(task.id());
+                    
+                    // 释放分布式锁，允许其他操作
                     unlockTask(task.id().asString(), lockResult);
 
                     LOG.info("task({}) finished.", task.id().toString());
                 }
             }
+            // 如果没有获取到锁或任务已完成，直接结束（其他节点可能已经在处理）
         }
     }
 

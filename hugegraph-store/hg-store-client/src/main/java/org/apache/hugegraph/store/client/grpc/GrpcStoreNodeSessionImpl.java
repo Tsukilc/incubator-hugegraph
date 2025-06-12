@@ -17,28 +17,14 @@
 
 package org.apache.hugegraph.store.client.grpc;
 
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-
-import javax.annotation.concurrent.NotThreadSafe;
-
-import org.apache.hugegraph.store.HgKvEntry;
-import org.apache.hugegraph.store.HgKvIterator;
-import org.apache.hugegraph.store.HgKvStore;
-import org.apache.hugegraph.store.HgOwnerKey;
-import org.apache.hugegraph.store.HgScanQuery;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.hugegraph.store.*;
 import org.apache.hugegraph.store.client.HgStoreNode;
 import org.apache.hugegraph.store.client.HgStoreNodeManager;
 import org.apache.hugegraph.store.client.HgStoreNodeSession;
-import org.apache.hugegraph.store.client.util.HgAssert;
-import org.apache.hugegraph.store.client.util.HgStoreClientConfig;
-import org.apache.hugegraph.store.client.util.HgStoreClientConst;
-import org.apache.hugegraph.store.client.util.HgStoreClientUtil;
-import org.apache.hugegraph.store.client.util.HgUuid;
+import org.apache.hugegraph.store.client.util.*;
 import org.apache.hugegraph.store.grpc.common.GraphMethod;
 import org.apache.hugegraph.store.grpc.common.Key;
 import org.apache.hugegraph.store.grpc.common.OpType;
@@ -47,10 +33,13 @@ import org.apache.hugegraph.store.grpc.session.BatchEntry;
 import org.apache.hugegraph.store.grpc.stream.HgStoreStreamGrpc.HgStoreStreamStub;
 import org.apache.hugegraph.store.grpc.stream.ScanStreamReq;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
-
-import lombok.extern.slf4j.Slf4j;
+import javax.annotation.concurrent.NotThreadSafe;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * created on 2022/01/19
@@ -187,6 +176,7 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
         return this.prepareBatchEntry(OpType.OP_TYPE_PUT, table, ownerKey, null, value);
     }
 
+    // todo：此处代办
     @Override
     public boolean directPut(String table, int partitionId, HgOwnerKey key, byte[] value) {
         return false;
@@ -270,79 +260,79 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
     @Override
     public List<HgKvEntry> batchGetOwner(String table, List<HgOwnerKey> keyList) {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doBatchGet(this, table, keyList),
-                           e -> e.getKeyValueResponse().getKvList()
-                                 .stream()
-                                 .map(kv -> (HgKvEntry) new GrpcKvEntryImpl(kv.getKey().toByteArray()
-                                         , kv.getValue().toByteArray(), kv.getCode())
-                                 )
-                                 .collect(Collectors.toList()))
-                            .orElse((List<HgKvEntry>) HgStoreClientConst.EMPTY_LIST);
+                        () -> this.storeSessionClient.doBatchGet(this, table, keyList),
+                        e -> e.getKeyValueResponse().getKvList()
+                                .stream()
+                                .map(kv -> (HgKvEntry) new GrpcKvEntryImpl(kv.getKey().toByteArray()
+                                        , kv.getValue().toByteArray(), kv.getCode())
+                                )
+                                .collect(Collectors.toList()))
+                .orElse((List<HgKvEntry>) HgStoreClientConst.EMPTY_LIST);
     }
 
     @Override
     public HgKvIterator<HgKvEntry> batchPrefix(String table, List<HgOwnerKey> keyList) {
         return GrpcKvIteratorImpl.of(this,
-                                     this.storeStreamClient.doBatchScanOneShot(this,
-                                                                               HgScanQuery.prefixOf(
-                                                                                       table,
-                                                                                       keyList))
+                this.storeStreamClient.doBatchScanOneShot(this,
+                        HgScanQuery.prefixOf(
+                                table,
+                                keyList))
         );
     }
 
     @Override
     public boolean existsTable(String table) {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doTable(this, table,
-                                                                 TableMethod.TABLE_METHOD_EXISTS),
-                           e -> true)
-                            .orElse(false);
+                        () -> this.storeSessionClient.doTable(this, table,
+                                TableMethod.TABLE_METHOD_EXISTS),
+                        e -> true)
+                .orElse(false);
     }
 
     @Override
     public boolean createTable(String table) {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doTable(this, table,
-                                                                 TableMethod.TABLE_METHOD_CREATE),
-                           e -> true)
-                            .orElse(false);
+                        () -> this.storeSessionClient.doTable(this, table,
+                                TableMethod.TABLE_METHOD_CREATE),
+                        e -> true)
+                .orElse(false);
     }
 
     @Override
     public boolean deleteTable(String table) {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doTable(this, table,
-                                                                 TableMethod.TABLE_METHOD_DELETE),
-                           e -> true)
-                            .orElse(false);
+                        () -> this.storeSessionClient.doTable(this, table,
+                                TableMethod.TABLE_METHOD_DELETE),
+                        e -> true)
+                .orElse(false);
     }
 
     @Override
     public boolean dropTable(String table) {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doTable(this, table,
-                                                                 TableMethod.TABLE_METHOD_DROP),
-                           e -> true)
-                            .orElse(false);
+                        () -> this.storeSessionClient.doTable(this, table,
+                                TableMethod.TABLE_METHOD_DROP),
+                        e -> true)
+                .orElse(false);
     }
 
     @Override
     public boolean deleteGraph(String graph) {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doGraph(this, graph,
-                                                                 GraphMethod.GRAPH_METHOD_DELETE),
-                           e -> true)
-                            .orElse(false);
+                        () -> this.storeSessionClient.doGraph(this, graph,
+                                GraphMethod.GRAPH_METHOD_DELETE),
+                        e -> true)
+                .orElse(false);
     }
 
     @Override
     public boolean truncate() {
         return this.notifier.invoke(
-                           () -> this.storeSessionClient.doTable(this,
-                                                                 HgStoreClientConst.EMPTY_TABLE
-                                   , TableMethod.TABLE_METHOD_TRUNCATE),
-                           e -> true)
-                            .orElse(false);
+                        () -> this.storeSessionClient.doTable(this,
+                                HgStoreClientConst.EMPTY_TABLE
+                                , TableMethod.TABLE_METHOD_TRUNCATE),
+                        e -> true)
+                .orElse(false);
     }
 
     @Override
@@ -354,11 +344,11 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
     public HgKvIterator<HgKvEntry> scanIterator(String table, long limit) {
         return this.switcher.invoke(getSwitcherSupplier(limit)
                 , () -> GrpcKvIteratorImpl.of(this, this.storeStreamClient.doScan
-                                                                                  (this, table,
-                                                                                   limit))
+                        (this, table,
+                                limit))
                 , () -> GrpcKvIteratorImpl.of(this, this.storeStreamClient.doScanOneShot
-                                                                                  (this, table,
-                                                                                   limit))
+                        (this, table,
+                                limit))
         ).get();
     }
 
@@ -366,8 +356,8 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
     public HgKvIterator<HgKvEntry> scanIterator(ScanStreamReq.Builder builder) {
         HgStoreStreamStub stub = getStub();
         KvPageScanner scanner = new KvPageScanner(this,
-                                                  stub,
-                                                  builder);
+                stub,
+                builder);
         return GrpcKvIteratorImpl.of(this, scanner);
     }
 
@@ -397,56 +387,56 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
     public HgKvIterator<HgKvEntry> scanIterator(String table, long limit, byte[] query) {
         return this.switcher.invoke(getSwitcherSupplier(limit)
                 , () -> GrpcKvIteratorImpl.of(this, this.storeStreamClient.doScan
-                                                                                  (this, table,
-                                                                                   limit, query))
+                        (this, table,
+                                limit, query))
                 , () -> GrpcKvIteratorImpl.of(this, this.storeStreamClient.doScanOneShot
-                                                                                  (this, table,
-                                                                                   limit, query))
+                        (this, table,
+                                limit, query))
         ).get();
     }
 
     @Override
     public HgKvIterator<HgKvEntry> scanIterator(String table, HgOwnerKey keyPrefix) {
         return GrpcKvIteratorImpl.of(this,
-                                     this.storeStreamClient.doScan(this, table, keyPrefix, 0));
+                this.storeStreamClient.doScan(this, table, keyPrefix, 0));
     }
 
     @Override
     public HgKvIterator<HgKvEntry> scanIterator(String table, HgOwnerKey keyPrefix, long limit) {
         return this.switcher.invoke(getSwitcherSupplier(limit),
-                                    () -> GrpcKvIteratorImpl.of(this,
-                                                                this.storeStreamClient.doScan(this,
-                                                                                              table,
-                                                                                              keyPrefix,
-                                                                                              limit)),
-                                    () -> GrpcKvIteratorImpl.of(this,
-                                                                this.storeStreamClient.doScanOneShot(
-                                                                        this,
-                                                                        table,
-                                                                        keyPrefix,
-                                                                        limit)))
-                            .get();
+                        () -> GrpcKvIteratorImpl.of(this,
+                                this.storeStreamClient.doScan(this,
+                                        table,
+                                        keyPrefix,
+                                        limit)),
+                        () -> GrpcKvIteratorImpl.of(this,
+                                this.storeStreamClient.doScanOneShot(
+                                        this,
+                                        table,
+                                        keyPrefix,
+                                        limit)))
+                .get();
     }
 
     @Override
     public HgKvIterator<HgKvEntry> scanIterator(String table, HgOwnerKey keyPrefix, long limit,
                                                 byte[] query) {
         return this.switcher.invoke(getSwitcherSupplier(limit),
-                                    () -> GrpcKvIteratorImpl.of(this,
-                                                                this.storeStreamClient.doScan(
-                                                                        this,
-                                                                        table,
-                                                                        keyPrefix,
-                                                                        limit,
-                                                                        query)),
-                                    () -> GrpcKvIteratorImpl.of(this,
-                                                                this.storeStreamClient.doScanOneShot(
-                                                                        this,
-                                                                        table,
-                                                                        keyPrefix,
-                                                                        limit,
-                                                                        query)))
-                            .get();
+                        () -> GrpcKvIteratorImpl.of(this,
+                                this.storeStreamClient.doScan(
+                                        this,
+                                        table,
+                                        keyPrefix,
+                                        limit,
+                                        query)),
+                        () -> GrpcKvIteratorImpl.of(this,
+                                this.storeStreamClient.doScanOneShot(
+                                        this,
+                                        table,
+                                        keyPrefix,
+                                        limit,
+                                        query)))
+                .get();
     }
 
     @Override
@@ -459,16 +449,16 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
     public HgKvIterator<HgKvEntry> scanIterator(String table, HgOwnerKey startKey,
                                                 HgOwnerKey endKey, long limit) {
         return scanIterator(table, startKey, endKey, limit,
-                            HgStoreClientUtil.isValid(endKey) ? HgStoreClientConst.SCAN_TYPE_RANGE :
-                            HgStoreClientConst.SCAN_TYPE_ANY, null);
+                HgStoreClientUtil.isValid(endKey) ? HgStoreClientConst.SCAN_TYPE_RANGE :
+                        HgStoreClientConst.SCAN_TYPE_ANY, null);
     }
 
     @Override
     public HgKvIterator<HgKvEntry> scanIterator(String table, HgOwnerKey startKey,
                                                 HgOwnerKey endKey, long limit, byte[] query) {
         return scanIterator(table, startKey, endKey, limit,
-                            HgStoreClientUtil.isValid(endKey) ? HgStoreClientConst.SCAN_TYPE_RANGE :
-                            HgStoreClientConst.SCAN_TYPE_ANY, query);
+                HgStoreClientUtil.isValid(endKey) ? HgStoreClientConst.SCAN_TYPE_RANGE :
+                        HgStoreClientConst.SCAN_TYPE_ANY, query);
     }
 
     @Override
@@ -477,25 +467,25 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
                                                 long limit, int scanType, byte[] query) {
 
         return this.switcher.invoke(getSwitcherSupplier(limit),
-                                    () -> GrpcKvIteratorImpl.of(this,
-                                                                this.storeStreamClient.doScan(
-                                                                        this,
-                                                                        table,
-                                                                        startKey,
-                                                                        endKey,
-                                                                        limit,
-                                                                        scanType,
-                                                                        query)),
-                                    () -> GrpcKvIteratorImpl.of(this,
-                                                                this.storeStreamClient.doScanOneShot(
-                                                                        this,
-                                                                        table,
-                                                                        startKey,
-                                                                        endKey,
-                                                                        limit,
-                                                                        scanType,
-                                                                        query)))
-                            .get();
+                        () -> GrpcKvIteratorImpl.of(this,
+                                this.storeStreamClient.doScan(
+                                        this,
+                                        table,
+                                        startKey,
+                                        endKey,
+                                        limit,
+                                        scanType,
+                                        query)),
+                        () -> GrpcKvIteratorImpl.of(this,
+                                this.storeStreamClient.doScanOneShot(
+                                        this,
+                                        table,
+                                        startKey,
+                                        endKey,
+                                        limit,
+                                        scanType,
+                                        query)))
+                .get();
 
     }
 
@@ -507,22 +497,22 @@ class GrpcStoreNodeSessionImpl implements HgStoreNodeSession {
             log.debug("scanIterator-scanType: {}", scanType);
         }
         return GrpcKvIteratorImpl.of(this,
-                                     this.storeStreamClient.doScan(this, table
-                                             , HgOwnerKey.newEmpty().codeToKey(codeFrom)
-                                             , HgOwnerKey.newEmpty().codeToKey(codeTo)
-                                             , HgStoreClientConst.NO_LIMIT
-                                             , HgKvStore.SCAN_PREFIX_BEGIN |
-                                               HgKvStore.SCAN_HASHCODE | scanType
-                                             , query
-                                     )
+                this.storeStreamClient.doScan(this, table
+                        , HgOwnerKey.newEmpty().codeToKey(codeFrom)
+                        , HgOwnerKey.newEmpty().codeToKey(codeTo)
+                        , HgStoreClientConst.NO_LIMIT
+                        , HgKvStore.SCAN_PREFIX_BEGIN |
+                                HgKvStore.SCAN_HASHCODE | scanType
+                        , query
+                )
         );
     }
 
     @Override
     public List<HgKvIterator<HgKvEntry>> scanBatch(HgScanQuery scanQuery) {
         return Collections.singletonList(GrpcKvIteratorImpl.of(this,
-                                                               this.storeStreamClient.doBatchScan(
-                                                                       this, scanQuery)
+                this.storeStreamClient.doBatchScan(
+                        this, scanQuery)
         ));
     }
 
