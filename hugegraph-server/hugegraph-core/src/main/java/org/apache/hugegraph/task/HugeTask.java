@@ -66,21 +66,21 @@ public class HugeTask<V> extends FutureTask<V> {
 
     private String type;
     private String name;
-    private final Id id;
-    private final Id parent;
-    private Set<Id> dependencies;
+    private final Id id; // 任务ID
+    private final Id parent; // 父任务ID
+    private Set<Id> dependencies; // 依赖的任务ID列表
     private String description;
     private String context;
     private Date create;
     private Id server;
     private int load;
 
-    private volatile TaskStatus status;
+    private volatile TaskStatus status; // 任务状态
     private volatile int progress;
     private volatile Date update;
     private volatile int retries;
-    private volatile String input;
-    private volatile String result;
+    private volatile String input; // 任务输入
+    private volatile String result; // 任务结果
 
     public HugeTask(Id id, Id parent, String callable, String input) {
         this(id, parent, TaskCallable.fromClass(callable));
@@ -503,6 +503,7 @@ public class HugeTask<V> extends FutureTask<V> {
         }
     }
 
+    // 将任务数据（包括结果）准备为持久化格式
     protected synchronized Object[] asArray() {
         E.checkState(this.type != null, "Task type can't be null");
         E.checkState(this.name != null, "Task name can't be null");
@@ -579,6 +580,7 @@ public class HugeTask<V> extends FutureTask<V> {
         return list.toArray();
     }
 
+    // 将任务数据（不包括结果）准备为持久化格式
     protected synchronized Object[] asArrayWithoutResult() {
         E.checkState(this.type != null, "Task type can't be null");
         E.checkState(this.name != null, "Task name can't be null");

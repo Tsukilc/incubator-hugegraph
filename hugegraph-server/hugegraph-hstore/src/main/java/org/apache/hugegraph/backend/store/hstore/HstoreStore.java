@@ -71,6 +71,9 @@ import org.slf4j.Logger;
 
 import com.google.common.collect.ImmutableSet;
 
+// HStoreStore 是 HugeGraph 的一个后端存储实现，它适配了华为云 HStore 服务。
+// 此类主要负责将 HugeGraph 的图数据操作（如增删改查顶点、边、索引等）
+// 转换为对 HStore 表的操作。
 public abstract class HstoreStore extends AbstractBackendStore<Session> {
 
     private static final Logger LOG = Log.logger(HstoreStore.class);
@@ -143,6 +146,10 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
             case OLAP:
                 table = HugeTableType.OLAP_TABLE;
                 break;
+            // 当操作类型为 TASK 时，将其路由到 HstoreTables.TaskInfo 表进行处理。
+            // HugeTask.P.TASK (任务信息) 和 HugeTaskResult.P.TASKRESULT (任务结果)
+            // 在HStore的实现中，通常会映射到同一个或相关的表结构中，
+            // HstoreTables.TaskInfo 会封装对这些任务相关数据的具体读写逻辑。
             case TASK:
                 table = HugeTableType.TASK_INFO_TABLE;
                 break;
@@ -256,6 +263,7 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
             HugeType key = entry.getKey();
             // in order to obtain the owner efficiently, special for edge
             boolean isEdge = key.isEdge();
+            // 根据 HugeType (如 TASK) 获取对应的 HstoreTable 实例 (如 HstoreTables.TaskInfo)
             HstoreTable hTable = this.table(key);
             Map<Id, List<BackendAction>> table = entry.getValue();
             Collection<List<BackendAction>> values = table.values();
@@ -263,6 +271,9 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
                 for (int i = 0; i < items.size(); i++) {
                     BackendAction item = items.get(i);
                     // set to ArrayList, use index to get item
+                    // 对任务信息 (HugeTask.P.TASK) 或任务结果 (HugeTaskResult.P.TASKRESULT) 的具体写操作
+                    // (如 insert, delete, append) 会在 HstoreTable 的相应方法中处理。
+                    // HstoreStore 本身不直接处理 TASK 或 TASKRESULT 的特殊逻辑，而是委托给 hTable。
                     this.mutate(session, item, hTable, isEdge);
                 }
             }
@@ -338,7 +349,13 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
         try {
             this.checkOpened();
             Session session = this.sessions.session();
+            // 根据查询类型获取对应的 HstoreTable 实例。
+            // 如果是针对任务的查询，getTableByQuery 会通过 HstoreTable.tableType(query)
+            // 最终解析到 HugeType.TASK，然后 this.table(HugeType.TASK) 返回 HstoreTables.TaskInfo。
             HstoreTable table = getTableByQuery(query);
+            // 具体的任务查询逻辑 (包括对 HugeTask.P.TASK 或 HugeTaskResult.P.TASKRESULT 的处理)
+            // 封装在 HstoreTables.TaskInfo 的 query 方法中。
+            // HstoreStore 本身不包含针对任务查询的特殊分支逻辑。
             Iterator<BackendEntry> entries = table.query(session, query);
             // Merge olap results as needed
             entries = getBackendEntryIterator(entries, query);

@@ -55,7 +55,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
     private final ExecutorService olapTaskExecutor;
     private final ExecutorService ephemeralTaskExecutor;
     private final ExecutorService gremlinTaskExecutor;
-    private final ScheduledThreadPoolExecutor schedulerExecutor;
+    private final ScheduledThreadPoolExecutor schedulerExecutor; // 用于周期性调度的执行器
     private final ScheduledFuture<?> cronFuture;
 
     /**
@@ -149,8 +149,11 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
     }
 
     /**
-     * 定时调度方法：这是分布式任务调度的核心逻辑
-     * 每个节点定期执行此方法，扫描数据库中的任务并进行状态管理
+     * 定时调度方法：这是分布式任务调度的核心逻辑。
+     * 在分布式环境中，每个 HugeGraph Server 节点都会定期执行此方法。
+     * 它负责扫描数据库中的任务，并根据任务状态进行相应的处理，
+     * 例如启动新任务、监控运行中的任务、重试失败的任务、处理取消和删除请求等。
+     * 通过这种方式，实现任务在集群中的统一调度和管理。
      */
     public void cronSchedule() {
         // Perform periodic scheduling tasks
@@ -171,6 +174,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             LOG.info("Try to start task({})@({}/{})", newTask.id(),
                      this.graphSpace, this.graphName);
             // 尝试启动任务，如果线程池满了会返回false
+            // 使用 tryLockTask 和 MetaManager 与 PD 协调，确保任务只被一个节点调度执行
             if (!tryStartHugeTask(newTask)) {
                 // Task submission failed when the thread pool is full.
                 break; // 线程池满了，停止处理更多任务
@@ -178,7 +182,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         }
 
         // === 第二阶段：处理RUNNING状态的任务 ===
-        // 检查运行中的任务是否还在正常执行，如果节点已释放锁则标记为失败
+        // 检查运行中的任务是否还在正常执行，如果节点已释放锁（通过 isLockedTask 判断，依赖 MetaManager 和 PD）则标记为失败
         // Handling tasks in RUNNING state
         Iterator<HugeTask<Object>> runnings =
             queryTaskWithoutResultByStatus(TaskStatus.RUNNING);
@@ -192,6 +196,7 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
                 LOG.info("Try to update task({})@({}/{}) status" +
                          "(RUNNING->FAILED)", running.id(), this.graphSpace,
                          this.graphName);
+                // 使用 updateStatusWithLock 尝试获取锁后更新状态
                 if (updateStatusWithLock(running.id(), TaskStatus.RUNNING,
                                          TaskStatus.FAILED)) {
                     runningTasks.remove(running.id());
@@ -216,14 +221,15 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             if (failed.retries() < this.graph().option(CoreOptions.TASK_RETRY)) {
                 LOG.info("Try to update task({})@({}/{}) status(FAILED->NEW)",
                          failed.id(), this.graphSpace, this.graphName);
-                // 重置为NEW状态，等待重新执行
+                // 重置为NEW状态，等待重新执行 (使用 updateStatusWithLock)
                 updateStatusWithLock(failed.id(), TaskStatus.FAILED,
                                      TaskStatus.NEW);
             }
         }
 
         // === 第四阶段：处理CANCELLING状态的任务 ===
-        // 处理正在取消的任务
+        // 处理正在取消的任务。如果任务在本地运行，则直接取消。
+        // 否则，如果任务没有被其他节点锁定（通过 isLockedTask 判断），则更新状态为CANCELLED。
         // Handling tasks in CANCELLING state
         Iterator<HugeTask<Object>> cancellings = queryTaskWithoutResultByStatus(
             TaskStatus.CANCELLING);
@@ -250,7 +256,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         }
 
         // === 第五阶段：处理DELETING状态的任务 ===
-        // 删除标记为删除的任务
+        // 删除标记为删除的任务。如果任务在本地运行，则先取消再删除。
+        // 否则，如果任务没有被其他节点锁定（通过 isLockedTask 判断），则直接从数据库删除。
         // Handling tasks in DELETING status
         Iterator<HugeTask<Object>> deletings = queryTaskWithoutResultByStatus(
             TaskStatus.DELETING);
@@ -314,8 +321,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             return this.ephemeralTaskExecutor.submit(task);
         }
 
-        // 4. 任务持久化：将任务保存到数据库，状态设置为 NEW
-        // 这样其他节点也能看到这个任务，是分布式调度的基础
+        // 4. 任务持久化：将任务保存到后端存储（例如数据库），状态设置为 NEW。
+        // 这样集群中的其他 HugeGraph Server 节点也能通过定时扫描发现这个新任务。
         // Process schema task
         // Handle gremlin task
         // Handle OLAP calculation tasks
@@ -323,8 +330,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         // TODO: save server id for task  // 注释：将来需要保存服务器ID，用于任务分配跟踪
         this.save(task);
 
-        // 5. 本地执行尝试：如果调度器未关闭，尝试在当前节点立即执行任务
-        // 这是一种优化策略：优先在创建任务的节点执行，避免不必要的调度延迟
+        // 5. 本地执行尝试：如果调度器未关闭，尝试在当前节点立即执行该任务。
+        // 这是一种优化策略，如果当前节点有空闲资源，可以避免任务在队列中等待被其他节点调度。
         if (!this.closed.get()) {
             LOG.info("Try to start task({})@({}/{}) immediately", task.id(),
                      this.graphSpace, this.graphName);
@@ -333,8 +340,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
             LOG.info("TaskScheduler has closed");
         }
 
-        // 6. 返回值：当前实现返回null，表示任务已提交但不提供Future跟踪
-        // 任务状态跟踪需要通过数据库查询实现
+        // 6. 返回值：当前实现返回null，表示任务已提交到调度系统，但不直接返回 Future 对象用于跟踪。
+        // 任务的执行状态和结果需要通过查询任务系统（如数据库）来获取。
         return null;
     }
 
@@ -580,11 +587,13 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
     }
 
     /**
-     * 尝试启动HugeTask：这是任务执行的核心方法
-     * 根据任务类型选择合适的线程池，如果有可用资源则立即执行
+     * 尝试启动HugeTask：这是任务执行的核心方法。
+     * 它会根据任务的类型（如 Gremlin 查询、Schema 操作、OLAP 计算等）
+     * 选择一个合适的本地线程池（ExecutorService）来执行任务。
+     * 如果选定的线程池有可用资源，则将任务包装成 TaskRunner 并提交执行。
      *
      * @param task 要执行的任务
-     * @return true 如果任务成功提交执行；false 如果线程池已满
+     * @return true 如果任务成功提交到选定的本地执行器；false 如果对应的执行器线程池已满，无法立即提交。
      */
     private boolean tryStartHugeTask(HugeTask<?> task) {
         // Print Scheduler status
@@ -716,7 +725,8 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
         @Override
         public void run() {
             // === 第一步：尝试获取任务锁 ===
-            // 使用分布式锁确保同一任务只在一个节点执行
+            // 在执行任务前，首先尝试获取该任务的分布式锁（通过 tryLockTask）。
+            // 这是为了确保在集群环境中，同一个任务不会被多个节点同时执行。
             LockResult lockResult = tryLockTask(task.id().asString());
 
             // 重新初始化任务参数（因为可能跨线程传递）
@@ -749,20 +759,21 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
 
                     // === 第五步：执行任务 ===
                     // Task execution will not throw exceptions, HugeTask will catch exceptions during execution and store them in the DB.
-                    // 任务执行不会抛出异常，HugeTask会捕获执行过程中的异常并存储到数据库
+                    // 调用 task.run() 来实际执行任务定义的逻辑。
+                    // HugeTask 内部会处理执行过程中的异常并将其存储到数据库，因此这里通常不会抛出异常。
                     task.run();
                 } catch (Throwable t) {
                     // === 异常处理 ===
                     // 记录执行过程中的异常（虽然正常情况下task.run()不应该抛异常）
                     LOG.warn("exception when execute task", t);
                 } finally {
-                    // === 第六步：清理资源 ===
-                    // 无论执行成功还是失败，都要进行清理
+                    // === 第六步：清理资源 (在 finally 块中确保执行) ===
+                    // 无论任务执行成功、失败或出现异常，都必须释放资源。
                     
                     // 从本地运行列表中移除任务
                     runningTasks.remove(task.id());
                     
-                    // 释放分布式锁，允许其他操作
+                    // 释放之前获取的分布式锁（通过 unlockTask），允许其他节点或操作处理该任务。
                     unlockTask(task.id().asString(), lockResult);
 
                     LOG.info("task({}) finished.", task.id().toString());
