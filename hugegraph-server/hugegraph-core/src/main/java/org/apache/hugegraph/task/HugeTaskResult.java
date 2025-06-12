@@ -32,6 +32,7 @@ import org.apache.tinkerpop.gremlin.structure.Vertex;
 import org.apache.tinkerpop.gremlin.structure.VertexProperty;
 import org.slf4j.Logger;
 
+// 用于存储任务执行结果，与任务本身分离，方便独立管理和查询
 public class HugeTaskResult {
     private static final Logger LOG = Log.logger(HugeTaskResult.class);
     private static final float DECOMPRESS_RATIO = 10.0F;
@@ -43,6 +44,7 @@ public class HugeTaskResult {
         this.result = null;
     }
 
+    // 生成结果ID，与任务ID相关联
     public static String genId(Id taskId) {
         return String.format("task_result_%d", taskId.asLong());
     }

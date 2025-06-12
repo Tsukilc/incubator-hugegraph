@@ -61,6 +61,9 @@ import io.netty.channel.ChannelHandler;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+// RaftEngine 是 PD (Placement Driver) 实现 Raft 分布式一致性算法的核心类。
+// 它负责管理 Raft 节点、处理 Raft 日志复制、领导者选举以及将操作应用到状态机，
+// 从而确保 PD 集群中元数据和调度信息的一致性。
 public class RaftEngine {
 
     private static final RaftEngine INSTANCE = new RaftEngine();
@@ -79,6 +82,7 @@ public class RaftEngine {
         return INSTANCE;
     }
 
+    // 初始化 RaftEngine，包括设置 Raft 节点、启动 RPC 服务、初始化状态机等。
     public boolean init(PDConfig.Raft config) {
         if (this.raftNode != null) {
             return false;
@@ -192,12 +196,16 @@ public class RaftEngine {
         this.raftNode = null;
     }
 
+    // 判断当前节点是否为 Raft 集群的领导者。
     public boolean isLeader() {
         return this.raftNode.isLeader(true);
     }
 
     /**
-     * Add a raft task, and grpc sends data to raft through this interface
+     * 添加一个 Raft 任务（注意：这里的 Task 是 JRaft 的 Task，不是 HugeGraph 的 HugeTask）。
+     * 当 gRPC 服务接收到需要持久化或在集群中达成一致的操作时，会将这些操作包装成 Raft Task，
+     *并通过此接口提交给 RaftEngine。RaftEngine (如果是 Leader) 会将该任务应用到
+     * 分布式状态机 (RaftStateMachine)，从而确保操作在所有节点上的一致性。
      */
     public void addTask(Task task) {
         if (!isLeader()) {
@@ -221,6 +229,7 @@ public class RaftEngine {
         return this.config;
     }
 
+    // 获取当前 Raft 集群的领导者 PeerId。
     public PeerId getLeader() {
         return raftNode.getLeaderId();
     }

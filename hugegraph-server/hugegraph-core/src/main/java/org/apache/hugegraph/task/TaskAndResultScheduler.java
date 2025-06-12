@@ -79,7 +79,8 @@ public abstract class TaskAndResultScheduler implements TaskScheduler {
         E.checkArgumentNotNull(task, "Task can't be null");
         String rawResult = task.result();
 
-        // Save task without result;
+        // 分两步保存任务信息：
+        // 1. 保存任务基本信息（不含结果）
         this.call(() -> {
             // Construct vertex from task
             HugeVertex vertex = this.tx().constructTaskVertex(task);
@@ -89,7 +90,7 @@ public abstract class TaskAndResultScheduler implements TaskScheduler {
             return this.tx().addVertex(vertex);
         });
 
-        // Save result outcome
+        // 2. 如果有结果，则单独保存任务结果
         if (rawResult != null) {
             HugeTaskResult result =
                 new HugeTaskResult(HugeTaskResult.genId(task.id()));
@@ -106,6 +107,7 @@ public abstract class TaskAndResultScheduler implements TaskScheduler {
 
     @Override
     public <V> HugeTask<V> task(Id id) {
+        // 先获取任务基本信息
         HugeTask<V> task = this.call(() -> {
             Iterator<Vertex> vertices = this.tx().queryTaskInfos(id);
             Vertex vertex = QueryResults.one(vertices);
@@ -119,6 +121,7 @@ public abstract class TaskAndResultScheduler implements TaskScheduler {
             throw new NotFoundException("Can't find task with id '%s'", id);
         }
 
+        // 然后单独获取并附加任务结果
         HugeTaskResult taskResult = queryTaskResult(id);
         if (taskResult != null) {
             task.result(taskResult);
@@ -129,12 +132,14 @@ public abstract class TaskAndResultScheduler implements TaskScheduler {
 
     @Override
     public <V> Iterator<HugeTask<V>> tasks(List<Id> ids) {
+        // 获取任务列表时，仅获取基本信息，不包含详细结果，通过调用 tasksWithoutResult 实现
         return this.tasksWithoutResult(ids);
     }
 
     @Override
     public <V> Iterator<HugeTask<V>> tasks(TaskStatus status, long limit,
                                            String page) {
+        // 获取任务列表时，仅获取基本信息，不包含详细结果，通过调用 queryTaskWithoutResult 实现
         if (status == null) {
             return this.queryTaskWithoutResult(ImmutableMap.of(), limit, page);
         }

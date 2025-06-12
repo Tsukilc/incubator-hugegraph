@@ -45,6 +45,7 @@ public class TaskAndResultTransaction extends TaskTransaction {
         this.autoCommit(true);
     }
 
+    // 准备任务顶点（不包含结果）
     public HugeVertex constructTaskVertex(HugeTask<?> task) {
         if (!this.graph().existsVertexLabel(TASK)) {
             throw new HugeException("Schema is missing for task(%s) '%s'",
@@ -54,6 +55,7 @@ public class TaskAndResultTransaction extends TaskTransaction {
         return this.constructVertex(false, task.asArrayWithoutResult());
     }
 
+    // 准备用于存储任务结果的独立顶点
     public HugeVertex constructTaskResultVertex(HugeTaskResult taskResult) {
         if (!this.graph().existsVertexLabel(TASKRESULT)) {
             throw new HugeException("Schema is missing for task result");
@@ -73,7 +75,7 @@ public class TaskAndResultTransaction extends TaskTransaction {
         HugeGraph graph = this.graph();
         String[] properties = this.initTaskResultProperties();
 
-        // Create vertex label '~taskresult'
+        // 创建顶点标签 '~taskresult' 用于存储任务结果
         VertexLabel label =
             graph.schema().vertexLabel(HugeTaskResult.P.TASKRESULT).properties(properties)
                  .nullableKeys(HugeTaskResult.P.RESULT)
