@@ -56,7 +56,22 @@ import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * The core implementation class of KV storage
+ * KvServiceGrpcImpl 是 PD 提供的 gRPC 服务接口的具体实现，主要负责处理键值 (KV) 相关的操作。
+ * 这包括基本的 PUT, GET, DELETE 操作，以及更复杂的分布式锁（lock, unlock, isLocked, keepAlive）
+ * 和带有 TTL (Time-To-Live) 的键值对操作。
+ *
+ * 对于分布式任务调度场景，HugeGraph Server 端的 `MetaManager` 会利用此服务提供的分布式锁功能
+ * 来协调不同 Server 节点对任务的竞争和执行权。例如，在 `DistributedTaskScheduler` 中，
+ * `tryLockTask` 和 `unlockTask` 方法会通过 gRPC调用这里的 `lock` 和 `unlock` 方法。
+ *
+ * 为了保证这些操作在 PD 集群中的一致性（例如，确保锁的唯一性），所有修改状态的操作
+ * （如 put, delete, lock, unlock）都会通过 Raft 协议进行复制和共识。
+ * 这意味着当一个 Server 请求锁时，该请求最终会被转发到 PD 的 Raft Leader 节点，
+ * Leader 节点会将锁操作包装成一个 `KVOperation`，并通过 RaftEngine 提交到 Raft Group。
+ * 只有当该操作被 Raft Group 提交后，锁才真正被授予或许可。
+ * 查询操作 (如 get, isLocked) 则直接查询当前 Leader 节点上通过 Raft 复制和应用的状态。
+ *
+ * 如果当前 PD 节点不是 Leader，它会将请求重定向到 Leader 节点处理 (`redirectToLeader`)。
  */
 @Slf4j
 @GRpcService
@@ -358,29 +373,50 @@ public class KvServiceGrpcImpl extends KvServiceGrpc.KvServiceImplBase implement
     }
 
     /**
-     * Locking
+     * 处理来自 HugeGraph Server 的分布式锁获取请求。
+     * 当 Server 端的 `DistributedTaskScheduler` (通过 `MetaManager`) 尝试获取一个任务锁时，
+     * 会调用此 gRPC 方法。
      *
-     * @param request
-     * @param responseObserver
+     * @param request 包含锁的键 (key, 通常是任务ID的字符串形式)、TTL (锁的租约时间) 和客户端ID。
+     * @param responseObserver 用于异步返回锁操作的结果。
      */
     @Override
     public void lock(LockRequest request, StreamObserver<LockResponse> responseObserver) {
+        // 1. 检查当前 PD 节点是否为 Raft Leader。
+        //    所有写操作（包括获取锁，因为它会改变锁的状态）都必须由 Leader 处理以保证一致性。
         if (!isLeader()) {
+            // 如果不是 Leader，则将请求重定向到已知的 Leader 节点。
+            // redirectToLeader 是一个辅助方法，用于将 gRPC 请求转发。
             redirectToLeader(channel, KvServiceGrpc.getLockMethod(), request, responseObserver);
             return;
         }
+
         LockResponse response;
         LockResponse.Builder builder = LockResponse.newBuilder();
         try {
             long clientId = request.getClientId();
+            // 如果客户端未提供ID，则生成一个随机ID。
             if (clientId == 0) {
                 clientId = getRandomLong();
             }
+
+            // 2. 调用底层的 kvService.lock() 方法来实际执行锁操作。
+            //    - kvService.lock() 内部会将锁操作（例如，创建一个代表锁的键值对）
+            //      包装成一个 KVOperation。
+            //    - 然后，这个 KVOperation 会通过 RaftEngine.addTask() 提交给 Raft Group。
+            //    - Raft 协议确保这个锁操作在整个 PD 集群中以一致的方式被应用。
+            //      只有当 Raft 日志被提交并且 KVOperation 在状态机中成功应用后，
+            //      这里的 this.kvService.lock() 才会返回 true (表示成功获取锁)。
             boolean locked = this.kvService.lock(request.getKey(), request.getTtl(), clientId);
+
+            // 3. 构建并返回响应。
+            //    如果 locked 为 true，表示 Server 成功获取了任务锁。
             response =
                     builder.setHeader(getResponseHeader()).setSucceed(locked).setClientId(clientId)
                            .build();
         } catch (PDException e) {
+            // 如果在锁操作过程中（包括 Raft 提交或应用阶段）发生错误，
+            // 再次检查是否因为 Leader 变更导致，如果是则重定向。
             if (!isLeader()) {
                 redirectToLeader(channel, KvServiceGrpc.getLockMethod(), request, responseObserver);
                 return;
@@ -427,6 +463,10 @@ public class KvServiceGrpcImpl extends KvServiceGrpc.KvServiceImplBase implement
 
     @Override
     public void isLocked(LockRequest request, StreamObserver<LockResponse> responseObserver) {
+        // 检查是否为 Leader，如果不是则重定向。
+        // 查询操作通常也建议在 Leader 上执行，以获取最新的、已提交的状态。
+        // 虽然 Raft 允许在 Follower 上执行只读查询（如果满足线性一致性或顺序一致性要求），
+        // 但最简单的做法是都重定向到 Leader。
         if (!isLeader()) {
             redirectToLeader(channel, KvServiceGrpc.getIsLockedMethod(), request, responseObserver);
             return;
@@ -434,6 +474,8 @@ public class KvServiceGrpcImpl extends KvServiceGrpc.KvServiceImplBase implement
         LockResponse response;
         LockResponse.Builder builder = LockResponse.newBuilder();
         try {
+            // 调用 kvService.locked() 查询指定 key (任务ID) 是否已被锁定。
+            // 这个查询会访问 PD 节点本地（但通过 Raft 保证一致性）的 KV 存储。
             boolean locked = this.kvService.locked(request.getKey());
             response = builder.setHeader(getResponseHeader()).setSucceed(locked).build();
         } catch (PDException e) {
@@ -450,13 +492,16 @@ public class KvServiceGrpcImpl extends KvServiceGrpc.KvServiceImplBase implement
     }
 
     /**
-     * Unlock
+     * 处理来自 HugeGraph Server 的分布式锁释放请求。
+     * 当 Server 端的 `DistributedTaskScheduler` (通过 `MetaManager`) 完成任务或不再需要锁时，
+     * 会调用此 gRPC 方法。
      *
-     * @param request
-     * @param responseObserver
+     * @param request 包含锁的键 (key) 和持有锁的客户端ID。
+     * @param responseObserver 用于异步返回解锁操作的结果。
      */
     @Override
     public void unlock(LockRequest request, StreamObserver<LockResponse> responseObserver) {
+        // 检查是否为 Leader，如果不是则重定向。
         if (!isLeader()) {
             redirectToLeader(channel, KvServiceGrpc.getUnlockMethod(), request, responseObserver);
             return;
@@ -465,10 +510,16 @@ public class KvServiceGrpcImpl extends KvServiceGrpc.KvServiceImplBase implement
         LockResponse.Builder builder = LockResponse.newBuilder();
         try {
             long clientId = request.getClientId();
+            // 客户端ID必须提供，用于验证是否为锁的持有者。
             if (clientId == 0) {
                 throw new PDException(-1, "incorrect clientId: 0");
             }
+
+            // 调用底层的 kvService.unlock() 方法。
+            // 与 lock() 类似，此操作也会通过 Raft 协议确保在集群中的一致性。
+            // 它会删除或更新代表锁的键值对。
             boolean unlocked = this.kvService.unlock(request.getKey(), clientId);
+
             response = builder.setHeader(getResponseHeader()).setSucceed(unlocked)
                               .setClientId(clientId).build();
         } catch (PDException e) {

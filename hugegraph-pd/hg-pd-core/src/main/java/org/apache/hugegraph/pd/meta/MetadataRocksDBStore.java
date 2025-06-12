@@ -71,9 +71,36 @@ public class MetadataRocksDBStore extends MetadataStoreBase {
         }
     }
 
+    /**
+     * 将键值对持久化到 RocksDB。
+     * 这是一个通用的存储方法，用于将任意的键值对写入底层的 RocksDB 实例。
+     *
+     * 在 PD 内部任务的保存流程中 (例如，当 TaskInfoMeta.addSplitTask() 被调用时)，
+     * 此方法扮演着一个关键角色：
+     * 1. TaskInfoMeta 将任务信息序列化为 value，并生成一个唯一的 key。
+     * 2. TaskInfoMeta 调用本类的 `put(key, value)` 方法。
+     * 3. **重要**：此 `put` 方法的调用路径实际上是 Raft 共识流程的一部分。
+     *    它并不是直接写入本地 RocksDB 然后结束。相反，它的调用通常源于 `RaftStateMachine.onApply()`。
+     *    - 当一个 "保存任务" 的操作通过 `RaftEngine.addTask()` 提交后，它会被复制到 Raft Group 的所有节点。
+     *    - 一旦该操作对应的 Raft 日志条目被大多数节点确认 (committed)，`RaftStateMachine.onApply()` 会在每个节点上被触发。
+     *    - 在 `onApply()` 内部，`KVOperation` (包含了这里的 key 和 value) 会被提取出来，
+     *      并传递给相应的 `RaftTaskHandler` (例如 `TaskInfoMeta` 的 `invoke` 方法)。
+     *    - 该 handler 最终会调用这里的 `put(key, value)` 方法 (通常是 `super.put(key, value)` 从 TaskInfoMeta 调用过来)，
+     *      以在当前节点上实际执行对 RocksDB 的写入操作。
+     *
+     * 因此，虽然代码看起来像是直接写入 `store` (HgKVStore，封装了 RocksDB)，
+     * 但这个写入动作是在 Raft 协议保证了该操作已在集群中达成共识之后才在每个节点上执行的。
+     * `getStore().put(key, value)` 是这个特定节点在 Raft 复制和应用流程中，执行本地数据持久化的最后一步。
+     *
+     * @param key 要存储的键
+     * @param value 要存储的值
+     * @throws PDException 如果 RocksDB 写入操作失败
+     */
     @Override
     public void put(byte[] key, byte[] value) throws PDException {
         try {
+            // getStore() 获取 HgKVStore 实例，它封装了对 RocksDB 的直接操作。
+            // 这里的 put 调用是实际将数据写入本节点 RocksDB 的操作。
             getStore().put(key, value);
         } catch (Exception e) {
             throw new PDException(Pdpb.ErrorType.ROCKSDB_WRITE_ERROR_VALUE, e);
