@@ -61,9 +61,13 @@ import io.netty.channel.ChannelHandler;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-// RaftEngine 是 PD (Placement Driver) 实现 Raft 分布式一致性算法的核心类。
-// 它负责管理 Raft 节点、处理 Raft 日志复制、领导者选举以及将操作应用到状态机，
-// 从而确保 PD 集群中元数据和调度信息的一致性。
+// RaftEngine 是 PD (Placement Driver) 实现 Raft 分布式一致性算法的核心引擎。
+// PD 作为一个独立的组件，负责管理 HugeGraph 集群的元数据、调度任务（如分区切分、负载均衡）等。
+// 为了保证这些关键数据的强一致性和高可用性，PD 内部采用 Raft 协议。
+// RaftEngine 封装了 JRaft 库的实现细节，提供了 Raft 节点的创建、启动、关闭，
+// 以及处理 Raft 日志复制、领导者选举、成员变更等核心功能。
+// 所有需要通过 Raft 达成共识的操作（例如，保存一个 PD 内部任务的请求），
+// 最终都会通过 RaftEngine 提交到 Raft Group，并由其分发到各个 PD 节点的 RaftStateMachine 进行应用。
 public class RaftEngine {
 
     private static final RaftEngine INSTANCE = new RaftEngine();
@@ -202,10 +206,30 @@ public class RaftEngine {
     }
 
     /**
-     * 添加一个 Raft 任务（注意：这里的 Task 是 JRaft 的 Task，不是 HugeGraph 的 HugeTask）。
-     * 当 gRPC 服务接收到需要持久化或在集群中达成一致的操作时，会将这些操作包装成 Raft Task，
-     *并通过此接口提交给 RaftEngine。RaftEngine (如果是 Leader) 会将该任务应用到
-     * 分布式状态机 (RaftStateMachine)，从而确保操作在所有节点上的一致性。
+     * 向 Raft Group 提交一个任务 (Task) 以进行共识处理。
+     * 注意：这里的 `Task` 是 JRaft 定义的 `com.alipay.sofa.jraft.entity.Task`，
+     * 它通常包装了一个需要通过 Raft 协议复制和应用的具体操作，例如一个 `KVOperation`。
+     * 这个 `KVOperation` 可能代表着对 PD 元数据的修改请求，比如创建一个新的 PD 内部任务（如分区切分任务）的持久化请求。
+     *
+     * 此方法是 PD 服务中所有需要通过 Raft 达成共识的操作的统一入口点。
+     *
+     * 工作流程：
+     * 1. 检查当前 PD 节点是否为 Raft Group 的 Leader。
+     *    - 如果不是 Leader，则直接拒绝该任务，并通过 `KVStoreClosure` 返回一个 "Not Leader" 错误。
+     *      客户端（通常是 gRPC 服务层）需要将请求重定向到当前的 Leader 节点。
+     * 2. 如果当前节点是 Leader，则调用 `this.raftNode.apply(task)` 将该任务提交给 Raft Group。
+     *    - JRaft 库会负责将这个任务序列化成 Raft 日志条目。
+     *    - Leader 节点会将这个日志条目复制到 Raft Group 中的其他 Follower 节点。
+     *    - 一旦大多数节点确认接收了该日志条目 (即日志被 "committed")，
+     *      RaftEngine (通过其内部的 RaftStateMachine) 会在所有节点上“应用”(apply) 这个日志条目中包含的操作。
+     *      这意味着 `RaftStateMachine.onApply()` 方法会被调用，进而执行 `KVOperation` 中定义的数据修改逻辑。
+     *
+     * 这个机制确保了所有对 PD 关键数据的修改请求（如 PD 内部任务的创建、更新、删除等）
+     * 都会以一致的方式在所有 PD 节点上被持久化和应用，从而保证了分布式环境下的数据一致性。
+     * 这就是 PD 内部任务 *持久化请求* 如何在分布式环境中被发起和初步处理的过程。
+     * 最终的“保存”动作发生在 RaftStateMachine 中。
+     *
+     * @param task 一个 JRaft Task 对象，通常包装了需要通过 Raft 共识处理的操作（如 KVOperation）。
      */
     public void addTask(Task task) {
         if (!isLeader()) {

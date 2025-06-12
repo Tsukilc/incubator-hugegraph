@@ -659,53 +659,84 @@ public class DistributedTaskScheduler extends TaskAndResultScheduler {
     }
 
     /**
-     * 尝试锁定任务：在分布式环境中确保任务只在一个节点执行
-     * 
-     * @param taskId 任务ID
-     * @return 锁结果对象，包含是否成功获取锁等信息
+     * 尝试获取指定任务的分布式锁。
+     * 此方法通过 `MetaManager` 与外部的元数据协调服务（通常是 PD - Placement Driver）进行交互，
+     * 请求对给定的 `taskId`（任务ID的字符串形式）进行加锁操作。
+     *
+     * 在多 HugeGraph Server 节点的分布式环境中，任务调度需要确保同一个任务（尤其是那些需要修改共享资源或具有副作用的任务）
+     * 不会被多个 Server 节点同时选取和执行，以避免数据不一致或竞态条件。分布式锁是实现这种互斥执行的关键机制。
+     *
+     * `MetaManager.instance()` 是一个单例，它封装了与 PD 通信的细节，如 gRPC 调用。
+     * `tryLockTask` 会向 PD 发送一个锁请求。PD 内部（通常通过 Raft 协议）保证锁的唯一性。
+     * 如果成功获取锁，PD 会返回一个包含锁信息的 `LockResult`。
+     *
+     * @param taskId 要锁定的任务的ID（字符串形式）。
+     * @return LockResult 对象，指示锁操作是否成功以及相关的锁信息。如果获取锁失败或过程中发生异常，
+     *         `lockResult.lockSuccess()` 可能为 false。
      */
     private LockResult tryLockTask(String taskId) {
 
         LockResult lockResult = new LockResult();
 
         try {
-            // 通过MetaManager获取分布式锁，防止同一任务在多个节点同时执行
+            // 通过 MetaManager 实例与 PD 交互，尝试获取任务的分布式锁。
+            // graphSpace 和 graphName 用于在 PD 中区分不同图的锁资源。
             lockResult =
                 MetaManager.instance().tryLockTask(graphSpace, graphName,
                                                    taskId);
         } catch (Throwable t) {
+            // 记录尝试加锁过程中发生的任何异常。
             LOG.warn(String.format("try to lock task(%s) error", taskId), t);
+            // 此时 lockResult.lockSuccess() 默认为 false 或由 MetaManager 设置。
         }
 
         return lockResult;
     }
 
     /**
-     * 释放任务锁：任务执行完成或失败后释放锁，允许其他操作
-     * 
-     * @param taskId 任务ID
-     * @param lockResult 之前获取锁时返回的结果对象
+     * 释放先前获取的指定任务的分布式锁。
+     * 此方法同样通过 `MetaManager` 与 PD 进行交互，请求释放由 `taskId` 和 `lockResult`（包含之前获取锁时PD返回的锁凭据）
+     * 标识的分布式锁。
+     *
+     * 当一个 Server 节点完成了对某个任务的处理（无论是成功、失败还是被取消），或者在某些异常情况下，
+     * 它必须释放该任务的锁，以便其他 Server 节点可以尝试获取并处理该任务（例如，在失败重试的场景下）
+     * 或者确保资源被正确清理。
+     *
+     * `MetaManager.instance().unlockTask` 会向 PD 发送解锁请求。PD 会验证锁凭据并释放锁。
+     *
+     * @param taskId 要解锁的任务的ID（字符串形式）。
+     * @param lockResult 先前调用 `tryLockTask` 时 PD 返回的 `LockResult` 对象，其中包含了释放锁所需的凭据。
      */
     private void unlockTask(String taskId, LockResult lockResult) {
 
         try {
-            // 释放之前获取的分布式锁
+            // 通过 MetaManager 实例与 PD 交互，释放任务的分布式锁。
             MetaManager.instance().unlockTask(graphSpace, graphName, taskId,
                                               lockResult);
         } catch (Throwable t) {
+            // 记录尝试解锁过程中发生的任何异常。
             LOG.warn(String.format("try to unlock task(%s) error",
                                    taskId), t);
         }
     }
 
     /**
-     * 检查任务是否被锁定：用于判断任务是否正在其他节点执行
-     * 
-     * @param taskId 任务ID
-     * @return true 如果任务被锁定；false 如果任务未被锁定
+     * 检查指定的任务当前是否已被分布式锁定。
+     * 此方法通过 `MetaManager` 查询 PD，以确定由 `taskId` 标识的任务目前是否被某个 Server 节点持有分布式锁。
+     *
+     * 这个检查在 `cronSchedule` 方法中非常重要，例如：
+     * - 当处理 RUNNING 状态的任务时，如果发现一个任务在数据库中是 RUNNING 状态，但 PD 显示它没有被任何节点锁定，
+     *   这可能意味着之前持有锁的 Server 节点已经崩溃，此时当前 Leader 调度器可以将该任务标记为 FAILED。
+     * - 当处理 CANCELLING 或 DELETING 状态的任务时，如果任务不在本地运行队列中，且 PD 显示它未被锁定，
+     *   则当前 Leader 调度器可以安全地将其状态更新为 CANCELLED 或从数据库中删除。
+     *
+     * `MetaManager.instance().isLockedTask` 会向 PD 发送查询请求，PD 根据其（通过 Raft 维护的）锁状态返回结果。
+     *
+     * @param taskId 要检查锁定状态的任务的ID（字符串形式）。
+     * @return 如果任务当前已被锁定，则返回 `true`；否则返回 `false`。
      */
     private boolean isLockedTask(String taskId) {
-        // 查询任务是否在分布式环境中被某个节点锁定
+        // 通过 MetaManager 实例查询 PD，检查任务是否已被分布式锁定。
         return MetaManager.instance().isLockedTask(graphSpace,
                                                    graphName, taskId);
     }

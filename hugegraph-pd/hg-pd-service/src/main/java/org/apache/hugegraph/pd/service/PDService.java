@@ -87,6 +87,43 @@ import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
 
 // TODO: uncomment later - remove license verifier service now
+/**
+ * PDService 是 PD (Placement Driver) 对外提供的核心 gRPC 服务实现。
+ * 它整合了 PD 内部的多个模块化服务（如 StoreNodeService, PartitionService, TaskScheduleService, IdService 等），
+ * 并通过 gRPC 接口暴露给 HugeGraph Server 和其他客户端。
+ *
+ * 主要功能包括：
+ * - **集群管理**:
+ *   - Store (HugeGraph Server 节点) 的注册、状态获取、心跳处理 (storeHeartbeat)。
+ *   - PD 成员信息查询 (getMembers)。
+ * - **元数据管理**:
+ *   - Graph (图实例) 的创建、查询、修改、删除。
+ *   - Partition (分区) 的查询、更新、删除。
+ *   - ShardGroup (分片组) 的管理。
+ * - **ID 生成**:
+ *   - 提供全局唯一 ID 的生成服务 (getId, resetId)。
+ * - **任务调度与协调**:
+ *   - 接收并处理数据分裂 (splitData)、分区迁移 (movePartition)、Leader 均衡 (balanceLeaders) 等请求。
+ *   - 接收任务执行结果汇报 (reportTask)。
+ * - **配置管理**:
+ *   - PD 自身配置的查询和修改 (getPDConfig, setPDConfig)。
+ *   - 图空间配置的管理 (getGraphSpace, setGraphSpace)。
+ *
+ * PDService 中的许多操作（特别是涉及到状态变更的）都需要通过 Raft 协议保证在 PD 集群中的一致性。
+ * 当 PDService 接收到一个需要共识的操作时，它会：
+ * 1. 检查当前节点是否为 Raft Leader。如果不是，则将请求重定向到 Leader。
+ * 2. 将操作委托给内部相应的服务处理（如 StoreNodeService, PartitionService）。
+ * 3. 这些内部服务在执行写操作时，会通过 RaftEngine 将操作提交到 Raft Group，
+ *    确保操作在所有 PD 节点上以一致的方式被应用和持久化。
+ *
+ * 对于 HugeGraph Server 的任务调度协调，PDService 扮演了关键角色：
+ * - `storeHeartbeat`: HugeGraph Server 通过此接口定期向 PD 报告其状态（包括负载、正在执行的任务等）。
+ *   这些信息被 `StoreNodeService` 用来更新 Server 节点的状态，PD 的 `ServerInfoManager` (在 HugeGraph Server 端)
+ *   也可能间接或直接通过 PD 的服务获取其他节点信息，从而支持分布式任务调度决策。
+ * - `getMembers`: 允许查询 PD 集群的成员列表和 Leader 信息，这对于客户端（包括 HugeGraph Server）
+ *   正确地将请求路由到 PD Leader 至关重要。RaftEngine 提供了底层的成员信息。
+ * - 其他与分区、图、Store 相关的接口也间接支持了任务调度的环境信息。
+ */
 @Slf4j
 @GRpcService
 public class PDService extends PDGrpc.PDImplBase implements ServiceGrpc, RaftStateListener {
@@ -547,7 +584,25 @@ public class PDService extends PDGrpc.PDImplBase implements ServiceGrpc, RaftSta
     }
 
     /**
-     * Handle store heartbeats
+     * 处理来自 HugeGraph Server 节点的心跳请求。
+     * HugeGraph Server 通过此接口定期向 PD 报告其自身的状态信息 (StoreStats)，
+     * 包括节点ID、地址、负载情况、分区信息、正在执行的任务数等。
+     *
+     * PD 的 `StoreNodeService` 会接收这些心跳数据，并据此：
+     * 1. 更新 Server 节点在 PD 中的状态（如是否存活、最新统计数据）。
+     * 2. 监控整个 HugeGraph 集群的健康状况。
+     * 3. 这些信息对于 PD 的调度决策（如分区迁移、副本放置）至关重要。
+     *
+     * 对于分布式任务调度而言，Server 的心跳信息使得 PD 能够了解各个节点的负载和可用性，
+     * 尽管具体的任务分配逻辑主要在 HugeGraph Server 端的 `DistributedTaskScheduler` 中实现，
+     * 但 PD 提供的集群视图是其决策的基础。
+     * Server 端的 `ServerInfoManager` 也可能依赖于从 PD 获取的（其他 Server 的）最新状态信息。
+     *
+     * 此操作如果涉及到更新 PD 内部关于 Store 节点的状态（例如，标记节点为 UP 或更新其统计数据），
+     * 并且这些状态需要集群共识，则 `storeNodeService.heartBeat()` 内部可能会触发 Raft 写操作。
+     *
+     * @param request 包含发送心跳的 Store 节点的统计信息 (StoreStats)。
+     * @param observer 用于异步返回心跳处理结果。
      */
     @Override
     public void storeHeartbeat(Pdpb.StoreHeartbeatRequest request,
@@ -943,7 +998,15 @@ public class PDService extends PDGrpc.PDImplBase implements ServiceGrpc, RaftSta
     }
 
     /**
-     * Obtain cluster member information
+     * 获取当前 PD 集群的成员列表和 Leader 信息。
+     * HugeGraph Server 或其他客户端可以使用此接口来发现 PD 集群的拓扑结构，
+     * 特别是定位当前的 Leader 节点，以便将写操作或需要强一致性读的操作路由到 Leader。
+     *
+     * 此信息直接从 `RaftEngine` 获取，`RaftEngine` 维护着 Raft Group 的成员配置和当前的 Leader 状态。
+     * Raft 协议自身保证了成员信息和 Leader 选举的一致性。
+     *
+     * @param request 获取成员信息的请求 (通常为空)。
+     * @param observer 用于异步返回 PD 集群的成员列表和 Leader 信息。
      */
     @Override
     public void getMembers(Pdpb.GetMembersRequest request,
