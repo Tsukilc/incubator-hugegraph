@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.util.Blob;
 import org.apache.hugegraph.util.E;
 import org.apache.hugegraph.util.Log;
@@ -33,6 +33,7 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty;
 import org.slf4j.Logger;
 
 public class HugeTaskResult {
+
     private static final Logger LOG = Log.logger(HugeTaskResult.class);
     private static final float DECOMPRESS_RATIO = 10.0F;
     private final String taskResultId;

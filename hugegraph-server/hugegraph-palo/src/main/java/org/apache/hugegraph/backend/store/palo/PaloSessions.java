@@ -34,7 +34,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.mysql.MysqlSessions;
 import org.apache.hugegraph.backend.store.mysql.ResultSetWrapper;
 import org.apache.hugegraph.config.HugeConfig;

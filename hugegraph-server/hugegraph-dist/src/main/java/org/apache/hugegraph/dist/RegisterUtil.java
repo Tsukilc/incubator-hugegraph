@@ -24,10 +24,10 @@ import java.util.ServiceLoader;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.backend.serializer.SerializerFactory;
 import org.apache.hugegraph.backend.store.BackendProviderFactory;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.OptionSpace;
 import org.apache.hugegraph.masterelection.RoleElectionOptions;
@@ -131,7 +131,7 @@ public class RegisterUtil {
         // Register RpcOptions (rpc-server)
         OptionSpace.register("rpc", "org.apache.hugegraph.config.RpcOptions");
         // Register AuthOptions (auth-server)
-        OptionSpace.register("auth", "org.apache.hugegraph.config.AuthOptions");
+        OptionSpace.register("auth", "org.apache.hugegraph.options.AuthOptions");
     }
 
     /**

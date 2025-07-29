@@ -30,8 +30,8 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.TableDefine;
 import org.apache.hugegraph.backend.store.mysql.MysqlBackendEntry;

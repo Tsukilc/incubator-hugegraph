@@ -28,7 +28,7 @@ import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.task.TaskManager;
@@ -36,12 +36,16 @@ import org.apache.hugegraph.traversal.algorithm.OltpTraverser;
 import org.apache.hugegraph.type.define.SerialEnum;
 import org.apache.hugegraph.util.E;
 import org.apache.hugegraph.util.Log;
+import org.apache.tinkerpop.gremlin.structure.Graph;
 import org.slf4j.Logger;
 
 public class HugeFactory {
 
+    public static final String SYS_GRAPH = Graph.Hidden.hide("sys_graph");
     private static final Logger LOG = Log.logger(HugeFactory.class);
-
+    private static final String NAME_REGEX = "^[A-Za-z][A-Za-z0-9_]{0,47}$";
+    private static final Map<String, HugeGraph> GRAPHS = new HashMap<>();
+    private static final AtomicBoolean SHUT_DOWN = new AtomicBoolean(false);
     private static final Thread SHUT_DOWN_HOOK = new Thread(() -> {
         LOG.info("HugeGraph is shutting down");
         HugeFactory.shutdown(30L, true);
@@ -53,12 +57,6 @@ public class HugeFactory {
 
         Runtime.getRuntime().addShutdownHook(SHUT_DOWN_HOOK);
     }
-
-    private static final String NAME_REGEX = "^[A-Za-z][A-Za-z0-9_]{0,47}$";
-
-    private static final Map<String, HugeGraph> GRAPHS = new HashMap<>();
-
-    private static final AtomicBoolean SHUT_DOWN = new AtomicBoolean(false);
 
     public static synchronized HugeGraph open(Configuration config) {
         HugeConfig conf = config instanceof HugeConfig ?

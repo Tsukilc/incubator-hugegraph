@@ -21,9 +21,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.cassandra.CassandraSessionPool;
 import org.apache.hugegraph.backend.store.cassandra.CassandraTable;
 import org.apache.hugegraph.backend.store.cassandra.CassandraTables;

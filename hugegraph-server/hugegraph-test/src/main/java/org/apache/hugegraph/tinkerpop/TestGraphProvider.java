@@ -31,7 +31,7 @@ import java.util.Set;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.perf.PerfUtil.Watched;
 import org.apache.hugegraph.structure.HugeEdge;
 import org.apache.hugegraph.structure.HugeElement;

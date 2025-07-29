@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hugegraph.backend.query.Condition.RelationType;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.Condition.RelationType;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.type.define.HugeKeys;
 import org.apache.hugegraph.util.E;

@@ -29,12 +29,12 @@ import java.util.concurrent.FutureTask;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.serializer.BytesBuffer;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.exception.LimitExceedException;
 import org.apache.hugegraph.exception.NotFoundException;
 import org.apache.hugegraph.job.ComputerJob;
@@ -59,15 +59,12 @@ public class HugeTask<V> extends FutureTask<V> {
     private static final Logger LOG = Log.logger(HugeTask.class);
 
     private static final float DECOMPRESS_RATIO = 10.0F;
-
-    private transient TaskScheduler scheduler = null;
-
     private final TaskCallable<V> callable;
-
-    private String type;
-    private String name;
     private final Id id;
     private final Id parent;
+    private transient TaskScheduler scheduler = null;
+    private String type;
+    private String name;
     private Set<Id> dependencies;
     private String description;
     private String context;
@@ -111,6 +108,28 @@ public class HugeTask<V> extends FutureTask<V> {
         this.result = null;
         this.server = null;
         this.load = 1;
+    }
+
+    public static <V> HugeTask<V> fromVertex(Vertex vertex) {
+        String callableName = vertex.value(P.CALLABLE);
+        TaskCallable<V> callable;
+        try {
+            callable = TaskCallable.fromClass(callableName);
+        } catch (Exception e) {
+            callable = TaskCallable.empty(e);
+        }
+
+        HugeTask<V> task = new HugeTask<>((Id) vertex.id(), null, callable);
+        for (Iterator<VertexProperty<Object>> iter = vertex.properties();
+             iter.hasNext(); ) {
+            VertexProperty<Object> prop = iter.next();
+            task.property(prop.key(), prop.value());
+        }
+        return task;
+    }
+
+    private static <V> Collector<V, ?, Set<V>> toOrderSet() {
+        return Collectors.toCollection(InsertionOrderUtil::newSet);
     }
 
     public Id id() {
@@ -695,28 +714,6 @@ public class HugeTask<V> extends FutureTask<V> {
         }
 
         return map;
-    }
-
-    public static <V> HugeTask<V> fromVertex(Vertex vertex) {
-        String callableName = vertex.value(P.CALLABLE);
-        TaskCallable<V> callable;
-        try {
-            callable = TaskCallable.fromClass(callableName);
-        } catch (Exception e) {
-            callable = TaskCallable.empty(e);
-        }
-
-        HugeTask<V> task = new HugeTask<>((Id) vertex.id(), null, callable);
-        for (Iterator<VertexProperty<Object>> iter = vertex.properties();
-             iter.hasNext(); ) {
-            VertexProperty<Object> prop = iter.next();
-            task.property(prop.key(), prop.value());
-        }
-        return task;
-    }
-
-    private static <V> Collector<V, ?, Set<V>> toOrderSet() {
-        return Collectors.toCollection(InsertionOrderUtil::newSet);
     }
 
     private void checkPropertySize(String property, String propertyName) {

@@ -31,7 +31,7 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.rocksdb.access.RocksDBSession.BackendColumn;

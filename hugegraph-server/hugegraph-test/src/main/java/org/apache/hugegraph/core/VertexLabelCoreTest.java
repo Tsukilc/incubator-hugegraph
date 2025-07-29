@@ -20,10 +20,10 @@ package org.apache.hugegraph.core;
 import java.util.Date;
 import java.util.List;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.exception.NoIndexException;
 import org.apache.hugegraph.exception.NotFoundException;
@@ -46,6 +46,14 @@ import org.junit.Test;
 import com.google.common.collect.ImmutableSet;
 
 public class VertexLabelCoreTest extends SchemaCoreTest {
+
+    private static void sleepAWhile(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            // ignore
+        }
+    }
 
     @Test
     public void testAddVertexLabel() {
@@ -1206,13 +1214,5 @@ public class VertexLabelCoreTest extends SchemaCoreTest {
                   .checkExist(false)
                   .create();
         });
-    }
-
-    private static void sleepAWhile(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            // ignore
-        }
     }
 }

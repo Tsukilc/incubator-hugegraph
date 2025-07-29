@@ -23,7 +23,7 @@ import java.util.Set;
 
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.iterator.FilterIterator;
 import org.apache.hugegraph.iterator.FlatMapperIterator;
@@ -35,10 +35,10 @@ import org.apache.tinkerpop.gremlin.structure.util.CloseableIterator;
 
 public class CountTraverser extends HugeTraverser {
 
-    private boolean containsTraversed = false;
-    private long dedupSize = 1000000L;
     private final Set<Id> dedupSet = newIdSet();
     private final MutableLong count = new MutableLong(0L);
+    private boolean containsTraversed = false;
+    private long dedupSize = 1000000L;
 
     public CountTraverser(HugeGraph graph) {
         super(graph);

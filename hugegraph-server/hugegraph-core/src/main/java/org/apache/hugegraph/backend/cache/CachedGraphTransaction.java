@@ -27,15 +27,15 @@ import java.util.Set;
 
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.backend.cache.CachedBackendStore.QueryId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.IdQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.IdQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.store.BackendMutation;
 import org.apache.hugegraph.backend.store.BackendStore;
 import org.apache.hugegraph.backend.store.ram.RamTable;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.event.EventListener;
@@ -133,7 +133,7 @@ public final class CachedGraphTransaction extends GraphTransaction {
             }
             return false;
         };
-        if(storeEventListenStatus.putIfAbsent(this.params().name(),true)==null){
+        if (storeEventListenStatus.putIfAbsent(this.params().name(), true) == null) {
             this.store().provider().listen(this.storeEventListener);
         }
 
@@ -184,7 +184,7 @@ public final class CachedGraphTransaction extends GraphTransaction {
             }
             return false;
         };
-        if(graphCacheListenStatus.putIfAbsent(this.params().name(),true)==null){
+        if (graphCacheListenStatus.putIfAbsent(this.params().name(), true) == null) {
             EventHub graphEventHub = this.params().graphEventHub();
             graphEventHub.listen(Events.CACHE, this.cacheEventListener);
         }
@@ -211,7 +211,7 @@ public final class CachedGraphTransaction extends GraphTransaction {
         graphEventHub.notify(Events.CACHE, action, type);
     }
 
-    private void clearCache(HugeType type, boolean notify) {
+    public void clearCache(HugeType type, boolean notify) {
         if (type == null || type == HugeType.VERTEX) {
             this.verticesCache.clear();
         }

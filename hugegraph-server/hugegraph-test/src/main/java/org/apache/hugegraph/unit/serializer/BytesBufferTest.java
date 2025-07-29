@@ -27,10 +27,10 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.IdGenerator.UuidId;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.IdGenerator.UuidId;
+import org.apache.hugegraph.serializer.BytesBuffer;
 import org.apache.hugegraph.schema.PropertyKey;
 import org.apache.hugegraph.testutil.Assert;
 import org.apache.hugegraph.type.define.Cardinality;
@@ -44,6 +44,27 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class BytesBufferTest extends BaseUnitTest {
+
+    private static String genString(int len) {
+        return new String(new char[len]).replace("\0", "a");
+    }
+
+    private static PropertyKey genPkey(DataType type) {
+        Id id = IdGenerator.of(0L);
+        return new FakeObjects().newPropertyKey(id, "fake-name", type);
+    }
+
+    private static PropertyKey genListPkey(DataType type) {
+        Id id = IdGenerator.of(0L);
+        return new FakeObjects().newPropertyKey(id, "fake-name", type,
+                                                Cardinality.LIST);
+    }
+
+    private static PropertyKey genSetPkey(DataType type) {
+        Id id = IdGenerator.of(0L);
+        return new FakeObjects().newPropertyKey(id, "fake-name", type,
+                                                Cardinality.SET);
+    }
 
     @Test
     public void testAllocate() {
@@ -1044,10 +1065,6 @@ public class BytesBufferTest extends BaseUnitTest {
         Assert.assertEquals("ab\uffff", buf.readStringWithEnding());
     }
 
-    private static String genString(int len) {
-        return new String(new char[len]).replace("\0", "a");
-    }
-
     private byte[] genBytes(int len) {
         byte[] bytes = new byte[len];
         Arrays.fill(bytes, (byte) 'a');
@@ -1062,22 +1079,5 @@ public class BytesBufferTest extends BaseUnitTest {
             bytes[i] = Integer.valueOf(b, 16).byteValue();
         }
         return bytes;
-    }
-
-    private static PropertyKey genPkey(DataType type) {
-        Id id = IdGenerator.of(0L);
-        return new FakeObjects().newPropertyKey(id, "fake-name", type);
-    }
-
-    private static PropertyKey genListPkey(DataType type) {
-        Id id = IdGenerator.of(0L);
-        return new FakeObjects().newPropertyKey(id, "fake-name", type,
-                                                Cardinality.LIST);
-    }
-
-    private static PropertyKey genSetPkey(DataType type) {
-        Id id = IdGenerator.of(0L);
-        return new FakeObjects().newPropertyKey(id, "fake-name", type,
-                                                Cardinality.SET);
     }
 }

@@ -50,7 +50,7 @@ import org.apache.commons.compress.parallel.InputStreamSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.NullInputStream;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

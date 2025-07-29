@@ -28,8 +28,8 @@ import org.apache.groovy.util.Maps;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.RedirectFilter;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.page.PageInfo;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.task.HugeTask;
@@ -60,10 +60,19 @@ import jakarta.ws.rs.core.Context;
 @Tag(name = "TaskAPI")
 public class TaskAPI extends API {
 
+    public static final String ACTION_CANCEL = "cancel";
     private static final Logger LOG = Log.logger(TaskAPI.class);
     private static final long NO_LIMIT = -1L;
 
-    public static final String ACTION_CANCEL = "cancel";
+    private static TaskStatus parseStatus(String status) {
+        try {
+            return TaskStatus.valueOf(status.toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException(String.format(
+                    "Status value must be in %s, but got '%s'",
+                    Arrays.asList(TaskStatus.values()), status));
+        }
+    }
 
     @GET
     @Timed
@@ -175,15 +184,5 @@ public class TaskAPI extends API {
         throw new BadRequestException(String.format(
                 "Can't cancel task '%s' which is completed or cancelling",
                 id));
-    }
-
-    private static TaskStatus parseStatus(String status) {
-        try {
-            return TaskStatus.valueOf(status.toUpperCase());
-        } catch (Exception e) {
-            throw new IllegalArgumentException(String.format(
-                    "Status value must be in %s, but got '%s'",
-                    Arrays.asList(TaskStatus.values()), status));
-        }
     }
 }

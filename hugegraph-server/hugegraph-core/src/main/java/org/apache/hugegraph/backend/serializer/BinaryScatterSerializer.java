@@ -18,8 +18,8 @@
 package org.apache.hugegraph.backend.serializer;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry.BackendColumn;
 import org.apache.hugegraph.config.HugeConfig;

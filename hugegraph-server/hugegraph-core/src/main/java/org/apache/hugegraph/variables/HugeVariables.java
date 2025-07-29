@@ -33,9 +33,9 @@ import org.apache.commons.collections.iterators.EmptyIterator;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.id.Id;
@@ -380,10 +380,11 @@ public class HugeVariables implements Graph.Variables {
     private List<Id> constructId(List<String> nameList) {
         VertexLabel vl = this.variableVertexLabel();
         List<Id> queryIdList = new ArrayList<>();
-        for (String name : nameList) {
-            queryIdList.add(
-                    SplicingIdGenerator.splicing(vl.id().asString(), name));
-        }
+        //todo:zzz
+        //for (String name : nameList) {
+        //    queryIdList.add(
+        //            SplicingIdGenerator.splicing(vl.id().asString(), name));
+        //}
         return queryIdList;
     }
 

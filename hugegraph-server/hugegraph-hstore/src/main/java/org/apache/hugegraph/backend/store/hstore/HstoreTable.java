@@ -29,17 +29,17 @@ import java.util.function.Supplier;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageState;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Aggregate.AggregateFunc;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.Condition.Relation;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Aggregate.AggregateFunc;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.Condition.Relation;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
 import org.apache.hugegraph.backend.serializer.BinaryEntryIterator;
 import org.apache.hugegraph.backend.store.BackendEntry;
@@ -503,7 +503,8 @@ public class HstoreTable extends BackendTable<Session, BackendEntry> {
         byte[] ownerKeyTo = this.ownerByQueryDelegate.apply(query.resultType(),
                                                             query.prefix());
         byte[] keyFrom = query.start().asBytes();
-        // In the prefix pagination query, start is the initial position. Because in different partitions, the query starts from the start position.
+        // In the prefix pagination query, start is the initial position. Because in different
+        // partitions, the query starts from the start position.
         if (query.paging()) {
             keyFrom = query.prefix().asBytes();
         }

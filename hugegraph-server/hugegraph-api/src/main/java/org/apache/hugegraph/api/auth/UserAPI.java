@@ -24,8 +24,8 @@ import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
 import org.apache.hugegraph.auth.HugeUser;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.define.Checkable;
 import org.apache.hugegraph.exception.NotFoundException;
@@ -58,6 +58,10 @@ import jakarta.ws.rs.core.Context;
 public class UserAPI extends API {
 
     private static final Logger LOG = Log.logger(UserAPI.class);
+
+    protected static Id parseId(String id) {
+        return IdGenerator.of(id);
+    }
 
     @POST
     @Timed
@@ -158,10 +162,6 @@ public class UserAPI extends API {
         } catch (NotFoundException e) {
             throw new IllegalArgumentException("Invalid user id: " + id);
         }
-    }
-
-    protected static Id parseId(String id) {
-        return IdGenerator.of(id);
     }
 
     @JsonIgnoreProperties(value = {"id", "user_creator",

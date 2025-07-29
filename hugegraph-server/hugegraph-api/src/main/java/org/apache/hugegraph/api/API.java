@@ -23,7 +23,7 @@ import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
 import org.apache.commons.lang.mutable.MutableLong;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.define.Checkable;
@@ -90,6 +90,16 @@ public class API {
     public static HugeGraph graph(GraphManager manager, String graphSpace,
                                   String graph) {
         HugeGraph g = manager.graph(graphSpace, graph);
+        if (g == null) {
+            throw new NotFoundException(String.format(
+                    "Graph '%s' does not exist", graph));
+        }
+        return g;
+    }
+
+    public static HugeGraph graph(GraphManager manager,
+                                  String graph) {
+        HugeGraph g = manager.graph(graph);
         if (g == null) {
             throw new NotFoundException(String.format(
                     "Graph '%s' does not exist", graph));
@@ -240,28 +250,28 @@ public class API {
             throw new NotSupportedException(String.format("Not support action '%s'", action));
         }
     }
-
-    public static boolean hasAdminPerm(GraphManager manager, String user) {
-        return manager.authManager().isAdminManager(user);
-    }
-
-    public static boolean hasSpaceManagerPerm(GraphManager manager,
-                                              String graphSpace,
-                                              String user) {
-        return manager.authManager().isSpaceManager(graphSpace, user);
-    }
-
-    public static boolean hasAnySpaceManagerPerm(GraphManager manager,
-                                                 String user) {
-        return manager.authManager().isSpaceManager(user);
-    }
-
-    public static boolean hasAdminOrSpaceManagerPerm(GraphManager manager,
-                                                     String graphSpace,
-                                                     String user) {
-        return hasAdminPerm(manager, user) ||
-               hasSpaceManagerPerm(manager, graphSpace, user);
-    }
+    //
+    //public static boolean hasAdminPerm(GraphManager manager, String user) {
+    //    return manager.authManager().isAdminManager(user);
+    //}
+    //
+    //public static boolean hasSpaceManagerPerm(GraphManager manager,
+    //                                          String graphSpace,
+    //                                          String user) {
+    //    return manager.authManager().isSpaceManager(graphSpace, user);
+    //}
+    //
+    //public static boolean hasAnySpaceManagerPerm(GraphManager manager,
+    //                                             String user) {
+    //    return manager.authManager().isSpaceManager(user);
+    //}
+    //
+    //public static boolean hasAdminOrSpaceManagerPerm(GraphManager manager,
+    //                                                 String graphSpace,
+    //                                                 String user) {
+    //    return hasAdminPerm(manager, user) ||
+    //           hasSpaceManagerPerm(manager, graphSpace, user);
+    //}
 
     public static void validPermission(boolean hasPermission, String user,
                                        String action) {

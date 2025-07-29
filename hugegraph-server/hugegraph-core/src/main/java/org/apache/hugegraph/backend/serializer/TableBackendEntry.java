@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.type.define.Cardinality;
@@ -35,97 +35,8 @@ import org.apache.hugegraph.type.define.HugeKeys;
 
 public class TableBackendEntry implements BackendEntry {
 
-    public static class Row {
-
-        private HugeType type;
-        private Id id;
-        private Id subId;
-        private final Map<HugeKeys, Object> columns;
-        private long ttl;
-
-        public Row(HugeType type) {
-            this(type, null);
-        }
-
-        public Row(HugeType type, Id id) {
-            this.type = type;
-            this.id = id;
-            this.subId = null;
-            this.columns = new ConcurrentHashMap<>();
-            this.ttl = 0L;
-        }
-
-        public HugeType type() {
-            return this.type;
-        }
-
-        public Id id() {
-            return this.id;
-        }
-
-        public Map<HugeKeys, Object> columns() {
-            return this.columns;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T column(HugeKeys key) {
-            // The T must be primitive type, or list/set/map of primitive type
-            return (T) this.columns.get(key);
-        }
-
-        public <T> void column(HugeKeys key, T value) {
-            this.columns.put(key, value);
-        }
-
-        public <T> void column(HugeKeys key, T value, Cardinality c) {
-            switch (c) {
-                case SINGLE:
-                    this.column(key, value);
-                    break;
-                case SET:
-                    // Avoid creating new Set when the key exists
-                    if (!this.columns.containsKey(key)) {
-                        this.columns.putIfAbsent(key, new LinkedHashSet<>());
-                    }
-                    this.<Set<T>>column(key).add(value);
-                    break;
-                case LIST:
-                    // Avoid creating new List when the key exists
-                    if (!this.columns.containsKey(key)) {
-                        this.columns.putIfAbsent(key, new LinkedList<>());
-                    }
-                    this.<List<T>>column(key).add(value);
-                    break;
-                default:
-                    throw new AssertionError("Unsupported cardinality: " + c);
-            }
-        }
-
-        public <T> void column(HugeKeys key, Object name, T value) {
-            if (!this.columns.containsKey(key)) {
-                this.columns.putIfAbsent(key, new ConcurrentHashMap<>());
-            }
-            this.<Map<Object, T>>column(key).put(name, value);
-        }
-
-        public void ttl(long ttl) {
-            this.ttl = ttl;
-        }
-
-        public long ttl() {
-            return this.ttl;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("Row{type=%s, id=%s, columns=%s}",
-                                 this.type, this.id, this.columns);
-        }
-    }
-
     private final Row row;
     private final List<Row> subRows;
-
     // NOTE: selfChanged is false when the row has not changed but subRows has.
     private boolean selfChanged;
     private boolean olap;
@@ -291,5 +202,93 @@ public class TableBackendEntry implements BackendEntry {
     @Override
     public void clear() {
         throw new NotImplementedException("Not supported by table backend");
+    }
+
+    public static class Row {
+
+        private final Map<HugeKeys, Object> columns;
+        private HugeType type;
+        private Id id;
+        private Id subId;
+        private long ttl;
+
+        public Row(HugeType type) {
+            this(type, null);
+        }
+
+        public Row(HugeType type, Id id) {
+            this.type = type;
+            this.id = id;
+            this.subId = null;
+            this.columns = new ConcurrentHashMap<>();
+            this.ttl = 0L;
+        }
+
+        public HugeType type() {
+            return this.type;
+        }
+
+        public Id id() {
+            return this.id;
+        }
+
+        public Map<HugeKeys, Object> columns() {
+            return this.columns;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> T column(HugeKeys key) {
+            // The T must be primitive type, or list/set/map of primitive type
+            return (T) this.columns.get(key);
+        }
+
+        public <T> void column(HugeKeys key, T value) {
+            this.columns.put(key, value);
+        }
+
+        public <T> void column(HugeKeys key, T value, Cardinality c) {
+            switch (c) {
+                case SINGLE:
+                    this.column(key, value);
+                    break;
+                case SET:
+                    // Avoid creating new Set when the key exists
+                    if (!this.columns.containsKey(key)) {
+                        this.columns.putIfAbsent(key, new LinkedHashSet<>());
+                    }
+                    this.<Set<T>>column(key).add(value);
+                    break;
+                case LIST:
+                    // Avoid creating new List when the key exists
+                    if (!this.columns.containsKey(key)) {
+                        this.columns.putIfAbsent(key, new LinkedList<>());
+                    }
+                    this.<List<T>>column(key).add(value);
+                    break;
+                default:
+                    throw new AssertionError("Unsupported cardinality: " + c);
+            }
+        }
+
+        public <T> void column(HugeKeys key, Object name, T value) {
+            if (!this.columns.containsKey(key)) {
+                this.columns.putIfAbsent(key, new ConcurrentHashMap<>());
+            }
+            this.<Map<Object, T>>column(key).put(name, value);
+        }
+
+        public void ttl(long ttl) {
+            this.ttl = ttl;
+        }
+
+        public long ttl() {
+            return this.ttl;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Row{type=%s, id=%s, columns=%s}",
+                                 this.type, this.id, this.columns);
+        }
     }
 }

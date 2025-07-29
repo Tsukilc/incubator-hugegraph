@@ -21,12 +21,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.RedirectFilter;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.store.raft.RaftAddPeerJob;
 import org.apache.hugegraph.backend.store.raft.RaftGroupManager;
 import org.apache.hugegraph.backend.store.raft.RaftRemovePeerJob;
@@ -59,6 +59,17 @@ import jakarta.ws.rs.core.Context;
 public class RaftAPI extends API {
 
     private static final Logger LOG = Log.logger(RaftAPI.class);
+
+    private static RaftGroupManager raftGroupManager(HugeGraph graph,
+                                                     String group,
+                                                     String operation) {
+        RaftGroupManager raftManager = graph.raftGroupManager();
+        if (raftManager == null) {
+            throw new HugeException("Allowed %s operation only when " +
+                                    "working on raft mode", operation);
+        }
+        return raftManager;
+    }
 
     @GET
     @Timed
@@ -203,16 +214,5 @@ public class RaftAPI extends API {
                .input(JsonUtil.toJson(inputs))
                .job(new RaftRemovePeerJob());
         return ImmutableMap.of("task_id", builder.schedule().id());
-    }
-
-    private static RaftGroupManager raftGroupManager(HugeGraph graph,
-                                                     String group,
-                                                     String operation) {
-        RaftGroupManager raftManager = graph.raftGroupManager();
-        if (raftManager == null) {
-            throw new HugeException("Allowed %s operation only when " +
-                                    "working on raft mode", operation);
-        }
-        return raftManager;
     }
 }

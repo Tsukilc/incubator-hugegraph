@@ -29,9 +29,9 @@ import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.CompressInterceptor.Compress;
 import org.apache.hugegraph.api.filter.DecompressInterceptor.Decompress;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.ServerOptions;
 import org.apache.hugegraph.core.GraphManager;
@@ -78,6 +78,63 @@ import jakarta.ws.rs.core.Context;
 public class EdgeAPI extends BatchAPI {
 
     private static final Logger LOG = Log.logger(EdgeAPI.class);
+
+    private static void checkBatchSize(HugeConfig config, List<JsonEdge> edges) {
+        int max = config.get(ServerOptions.MAX_EDGES_PER_BATCH);
+        if (edges.size() > max) {
+            throw new IllegalArgumentException(String.format(
+                    "Too many edges for one time post, " +
+                    "the maximum number is '%s'", max));
+        }
+        if (edges.isEmpty()) {
+            throw new IllegalArgumentException("The number of edges can't be 0");
+        }
+    }
+
+    private static Vertex getVertex(HugeGraph graph, Object id, String label) {
+        HugeVertex vertex;
+        try {
+            vertex = (HugeVertex) graph.vertices(id).next();
+        } catch (NoSuchElementException e) {
+            throw new IllegalArgumentException(String.format("Invalid vertex id '%s'", id));
+        }
+        if (label != null && !vertex.label().equals(label)) {
+            throw new IllegalArgumentException(String.format(
+                    "The label of vertex '%s' is unmatched, users expect " +
+                    "label '%s', actual label stored is '%s'",
+                    id, label, vertex.label()));
+        }
+        // Clone a new vertex to support multi-thread access
+        return vertex.copy();
+    }
+
+    private static Vertex newVertex(HugeGraph g, Object id, String label) {
+        VertexLabel vl = vertexLabel(g, label, "Invalid vertex label '%s'");
+        Id idValue = HugeVertex.getIdValue(id);
+        return new HugeVertex(g, idValue, vl);
+    }
+
+    private static VertexLabel vertexLabel(HugeGraph graph, String label, String message) {
+        try {
+            // NOTE: don't use SchemaManager because it will throw 404
+            return graph.vertexLabel(label);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(String.format(message, label));
+        }
+    }
+
+    public static Direction parseDirection(String direction) {
+        if (direction == null || direction.isEmpty()) {
+            return Direction.BOTH;
+        }
+        try {
+            return Direction.valueOf(direction);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(String.format(
+                    "Direction value must be in [OUT, IN, BOTH], " +
+                    "but got '%s'", direction));
+        }
+    }
 
     @POST
     @Timed(name = "single-create")
@@ -365,63 +422,6 @@ public class EdgeAPI extends BatchAPI {
                         "No such edge with id: '%s'", id));
             }
         });
-    }
-
-    private static void checkBatchSize(HugeConfig config, List<JsonEdge> edges) {
-        int max = config.get(ServerOptions.MAX_EDGES_PER_BATCH);
-        if (edges.size() > max) {
-            throw new IllegalArgumentException(String.format(
-                    "Too many edges for one time post, " +
-                    "the maximum number is '%s'", max));
-        }
-        if (edges.isEmpty()) {
-            throw new IllegalArgumentException("The number of edges can't be 0");
-        }
-    }
-
-    private static Vertex getVertex(HugeGraph graph, Object id, String label) {
-        HugeVertex vertex;
-        try {
-            vertex = (HugeVertex) graph.vertices(id).next();
-        } catch (NoSuchElementException e) {
-            throw new IllegalArgumentException(String.format("Invalid vertex id '%s'", id));
-        }
-        if (label != null && !vertex.label().equals(label)) {
-            throw new IllegalArgumentException(String.format(
-                    "The label of vertex '%s' is unmatched, users expect " +
-                    "label '%s', actual label stored is '%s'",
-                    id, label, vertex.label()));
-        }
-        // Clone a new vertex to support multi-thread access
-        return vertex.copy();
-    }
-
-    private static Vertex newVertex(HugeGraph g, Object id, String label) {
-        VertexLabel vl = vertexLabel(g, label, "Invalid vertex label '%s'");
-        Id idValue = HugeVertex.getIdValue(id);
-        return new HugeVertex(g, idValue, vl);
-    }
-
-    private static VertexLabel vertexLabel(HugeGraph graph, String label, String message) {
-        try {
-            // NOTE: don't use SchemaManager because it will throw 404
-            return graph.vertexLabel(label);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(String.format(message, label));
-        }
-    }
-
-    public static Direction parseDirection(String direction) {
-        if (direction == null || direction.isEmpty()) {
-            return Direction.BOTH;
-        }
-        try {
-            return Direction.valueOf(direction);
-        } catch (Exception e) {
-            throw new IllegalArgumentException(String.format(
-                    "Direction value must be in [OUT, IN, BOTH], " +
-                    "but got '%s'", direction));
-        }
     }
 
     private Id getEdgeId(HugeGraph g, JsonEdge newEdge) {

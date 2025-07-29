@@ -19,10 +19,10 @@ package org.apache.hugegraph.backend.store.hstore;
 
 import java.util.List;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.Condition.Relation;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.Condition.Relation;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.serializer.BinarySerializer;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry.BackendColumnIterator;

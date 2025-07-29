@@ -27,18 +27,18 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.SnowflakeIdGenerator;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.SnowflakeIdGenerator;
+import org.apache.hugegraph.id.SplicingIdGenerator;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
+import org.apache.hugegraph.serializer.BytesBuffer;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.masterelection.StandardClusterRoleStore;
 import org.apache.hugegraph.perf.PerfUtil.Watched;
 import org.apache.hugegraph.schema.EdgeLabel;
@@ -70,10 +70,9 @@ import com.google.common.collect.ImmutableList;
 public class HugeVertex extends HugeElement implements Vertex, Cloneable {
 
     private static final List<HugeEdge> EMPTY_LIST = ImmutableList.of();
-
+    protected Collection<HugeEdge> edges;
     private Id id;
     private VertexLabel label;
-    protected Collection<HugeEdge> edges;
 
     public HugeVertex(final HugeGraph graph, Id id, VertexLabel label) {
         super(graph);
@@ -90,6 +89,28 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
                 this.checkIdLength();
             }
         }
+    }
+
+    public static final Id getIdValue(Object idValue) {
+        return HugeElement.getIdValue(idValue);
+    }
+
+    public static HugeVertex undefined(HugeGraph graph, Id id) {
+        VertexLabel label = VertexLabel.undefined(graph);
+        return new HugeVertex(graph, id, label);
+    }
+
+    public static HugeVertex create(final GraphTransaction tx,
+                                    Id id, VertexLabel label) {
+        return new HugeVertex4Insert(tx, id, label);
+    }
+
+    private static <V> Set<V> newSet() {
+        return CollectionFactory.newSet(CollectionType.EC);
+    }
+
+    private static <V> List<V> newList() {
+        return CollectionFactory.newList(CollectionType.EC);
     }
 
     @Override
@@ -653,28 +674,6 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
     @Override
     public String toString() {
         return StringFactory.vertexString(this);
-    }
-
-    public static final Id getIdValue(Object idValue) {
-        return HugeElement.getIdValue(idValue);
-    }
-
-    public static HugeVertex undefined(HugeGraph graph, Id id) {
-        VertexLabel label = VertexLabel.undefined(graph);
-        return new HugeVertex(graph, id, label);
-    }
-
-    public static HugeVertex create(final GraphTransaction tx,
-                                    Id id, VertexLabel label) {
-        return new HugeVertex4Insert(tx, id, label);
-    }
-
-    private static <V> Set<V> newSet() {
-        return CollectionFactory.newSet(CollectionType.EC);
-    }
-
-    private static <V> List<V> newList() {
-        return CollectionFactory.newList(CollectionType.EC);
     }
 
     private static final class HugeVertex4Insert extends HugeVertex {

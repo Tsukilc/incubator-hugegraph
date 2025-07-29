@@ -25,7 +25,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.util.E;
 import org.apache.hugegraph.util.Log;
 import org.slf4j.Logger;
@@ -44,6 +44,13 @@ public class CacheManager {
     private final Map<String, Cache<Id, ?>> caches;
     private final Timer timer;
 
+    private CacheManager() {
+        this.caches = new ConcurrentHashMap<>();
+        this.timer = new Timer("cache-expirer", true);
+
+        this.scheduleTimer(TIMER_TICK_PERIOD);
+    }
+
     public static CacheManager instance() {
         return INSTANCE;
     }
@@ -53,13 +60,6 @@ public class CacheManager {
         E.checkArgument(cache != null,
                         "Not found cache named '%s'", name);
         return cache.enableMetrics(enabled);
-    }
-
-    private CacheManager() {
-        this.caches = new ConcurrentHashMap<>();
-        this.timer = new Timer("cache-expirer", true);
-
-        this.scheduleTimer(TIMER_TICK_PERIOD);
     }
 
     private TimerTask scheduleTimer(float period) {

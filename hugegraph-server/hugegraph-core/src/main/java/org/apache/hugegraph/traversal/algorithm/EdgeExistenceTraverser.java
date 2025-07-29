@@ -20,8 +20,8 @@ package org.apache.hugegraph.traversal.algorithm;
 import java.util.Iterator;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.iterator.FilterIterator;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.type.HugeType;

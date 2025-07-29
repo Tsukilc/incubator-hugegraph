@@ -20,14 +20,13 @@ package org.apache.hugegraph.unit.util;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.IndexLabel;
 import org.apache.hugegraph.schema.PropertyKey;

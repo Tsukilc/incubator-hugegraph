@@ -27,15 +27,15 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageState;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.Condition.Relation;
-import org.apache.hugegraph.backend.query.IdQuery;
-import org.apache.hugegraph.backend.query.Query;
-import org.apache.hugegraph.backend.query.Query.Order;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.Condition.Relation;
+import org.apache.hugegraph.query.IdQuery;
+import org.apache.hugegraph.query.Query;
+import org.apache.hugegraph.query.Query.Order;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendTable;
 import org.apache.hugegraph.backend.store.Shard;
@@ -81,6 +81,41 @@ public abstract class CassandraTable
 
     public CassandraTable(String table) {
         super(table);
+    }
+
+    protected static Select cloneSelect(Select select, String table) {
+        // NOTE: there is no Select.clone(), just use copy instead
+        return CopyUtil.copy(select, QueryBuilder.select().from(table));
+    }
+
+    protected static CassandraBackendEntry row2Entry(HugeType type, Row row) {
+        CassandraBackendEntry entry = new CassandraBackendEntry(type);
+
+        List<Definition> cols = row.getColumnDefinitions().asList();
+        for (Definition col : cols) {
+            String name = col.getName();
+            HugeKeys key = CassandraTable.parseKey(name);
+            Object value = row.getObject(name);
+            if (value == null) {
+                assert key == HugeKeys.EXPIRED_TIME;
+                continue;
+            }
+            entry.column(key, value);
+        }
+
+        return entry;
+    }
+
+    public static final String formatKey(HugeKeys key) {
+        return key.name();
+    }
+
+    public static final HugeKeys parseKey(String name) {
+        return HugeKeys.valueOf(name.toUpperCase());
+    }
+
+    public static final Clause formatEQ(HugeKeys key, Object value) {
+        return QueryBuilder.eq(formatKey(key), value);
     }
 
     @Override
@@ -405,34 +440,11 @@ public abstract class CassandraTable
         return selects;
     }
 
-    protected static Select cloneSelect(Select select, String table) {
-        // NOTE: there is no Select.clone(), just use copy instead
-        return CopyUtil.copy(select, QueryBuilder.select().from(table));
-    }
-
     protected Iterator<BackendEntry> results2Entries(Query q, ResultSet r) {
         return new CassandraEntryIterator(r, q, (e1, row) -> {
             CassandraBackendEntry e2 = row2Entry(q.resultType(), row);
             return this.mergeEntries(e1, e2);
         });
-    }
-
-    protected static CassandraBackendEntry row2Entry(HugeType type, Row row) {
-        CassandraBackendEntry entry = new CassandraBackendEntry(type);
-
-        List<Definition> cols = row.getColumnDefinitions().asList();
-        for (Definition col : cols) {
-            String name = col.getName();
-            HugeKeys key = CassandraTable.parseKey(name);
-            Object value = row.getObject(name);
-            if (value == null) {
-                assert key == HugeKeys.EXPIRED_TIME;
-                continue;
-            }
-            entry.column(key, value);
-        }
-
-        return entry;
     }
 
     protected List<HugeKeys> pkColumnName() {
@@ -458,18 +470,6 @@ public abstract class CassandraTable
     protected BackendEntry mergeEntries(BackendEntry e1, BackendEntry e2) {
         // Return the next entry (not merged)
         return e2;
-    }
-
-    public static final String formatKey(HugeKeys key) {
-        return key.name();
-    }
-
-    public static final HugeKeys parseKey(String name) {
-        return HugeKeys.valueOf(name.toUpperCase());
-    }
-
-    public static final Clause formatEQ(HugeKeys key, Object value) {
-        return QueryBuilder.eq(formatKey(key), value);
     }
 
     /**

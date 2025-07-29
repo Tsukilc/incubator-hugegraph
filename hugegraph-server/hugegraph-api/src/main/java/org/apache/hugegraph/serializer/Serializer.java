@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hugegraph.auth.SchemaDefine.AuthElement;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.IndexLabel;
 import org.apache.hugegraph.schema.PropertyKey;

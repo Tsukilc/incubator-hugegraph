@@ -19,7 +19,7 @@ package org.apache.hugegraph.backend.store;
 
 import java.util.Map;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.SchemaElement;
 import org.apache.hugegraph.type.define.CollectionType;
 import org.apache.hugegraph.util.collection.CollectionFactory;
@@ -31,9 +31,8 @@ import org.apache.hugegraph.util.collection.CollectionFactory;
 public class SystemSchemaStore {
 
     private static final int SYSTEM_SCHEMA_MAX_NUMS = 128;
-
-    private SchemaElement[] storeByIds;
     private final Map<String, SchemaElement> storeByNames;
+    private SchemaElement[] storeByIds;
 
     public SystemSchemaStore() {
         this.storeByIds = new SchemaElement[SYSTEM_SCHEMA_MAX_NUMS];

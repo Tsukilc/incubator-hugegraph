@@ -19,6 +19,7 @@ package org.apache.hugegraph;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -26,13 +27,18 @@ import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hugegraph.auth.AuthManager;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendFeatures;
-import org.apache.hugegraph.backend.store.BackendStoreInfo;
+import org.apache.hugegraph.backend.store.BackendMutation;
+import org.apache.hugegraph.backend.store.BackendStoreProvider;
+import org.apache.hugegraph.backend.store.BackendStoreSystemInfo;
 import org.apache.hugegraph.backend.store.raft.RaftGroupManager;
+import org.apache.hugegraph.backend.tx.SchemaTransaction;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.TypedOption;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.kvstore.KvStore;
 import org.apache.hugegraph.masterelection.GlobalMasterInfo;
 import org.apache.hugegraph.masterelection.RoleElectionStateMachine;
 import org.apache.hugegraph.rpc.RpcServiceConfig4Client;
@@ -45,6 +51,7 @@ import org.apache.hugegraph.schema.SchemaLabel;
 import org.apache.hugegraph.schema.SchemaManager;
 import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.structure.HugeFeatures;
+import org.apache.hugegraph.structure.KvElement;
 import org.apache.hugegraph.task.TaskScheduler;
 import org.apache.hugegraph.traversal.optimize.HugeCountStepStrategy;
 import org.apache.hugegraph.traversal.optimize.HugeGraphStepStrategy;
@@ -53,6 +60,7 @@ import org.apache.hugegraph.traversal.optimize.HugeVertexStepStrategy;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.type.define.GraphMode;
 import org.apache.hugegraph.type.define.GraphReadMode;
+import org.apache.hugegraph.type.define.LoadMode;
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategies;
 import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.Graph;
@@ -65,15 +73,58 @@ import com.alipay.remoting.rpc.RpcServer;
 /**
  * Graph interface for Gremlin operations
  */
-public interface HugeGraph extends Graph {
+public interface HugeGraph extends Graph, HugeGraphSupplier {
+
+    //todo: zzz
+    default List<String> mapIlId2Name(Collection<Id> ids) {
+        List<String> names = new ArrayList<>(ids.size());
+        for (Id id : ids) {
+            SchemaElement schema = this.indexLabel(id);
+            names.add(schema.name());
+        }
+        return names;
+    }
+
+    static void registerTraversalStrategies(Class<?> clazz) {
+        TraversalStrategies strategies = TraversalStrategies.GlobalCache
+                .getStrategies(Graph.class)
+                .clone();
+        strategies.addStrategies(HugeVertexStepStrategy.instance(),
+                                 HugeGraphStepStrategy.instance(),
+                                 HugeCountStepStrategy.instance(),
+                                 HugePrimaryKeyStrategy.instance());
+
+        TraversalStrategies.GlobalCache.registerStrategies(clazz, strategies);
+    }
+
+    //todo: zzz
+    default List<String> mapPkId2Name(Collection<Id> ids) {
+        List<String> names = new ArrayList<>(ids.size());
+        for (Id id : ids) {
+            SchemaElement schema = this.propertyKey(id);
+            names.add(schema.name());
+        }
+        return names;
+    }
+
+    // todo:zzz
+    void serverStarted(GlobalMasterInfo nodeInfo);
 
     HugeGraph hugegraph();
 
+    HugeGraph hugegraph(boolean required);
+
     SchemaManager schema();
+
+    SchemaTransaction schemaTransaction();
+
+    BackendStoreProvider storeProvider();
 
     Id getNextId(HugeType type);
 
     Id addPropertyKey(PropertyKey key);
+
+    void updatePropertyKey(PropertyKey old, PropertyKey upadte);
 
     void updatePropertyKey(PropertyKey key);
 
@@ -88,6 +139,8 @@ public interface HugeGraph extends Graph {
     PropertyKey propertyKey(Id key);
 
     boolean existsPropertyKey(String key);
+
+    boolean existsOlapTable(PropertyKey key);
 
     void addVertexLabel(VertexLabel label);
 
@@ -142,6 +195,16 @@ public interface HugeGraph extends Graph {
     @Override
     Vertex addVertex(Object... keyValues);
 
+    /**
+     * old vertex is used for removing old vertex's index
+     */
+    Vertex updateVertex(Vertex oldVertex, Object... newVertex);
+
+    /**
+     * old vertex is used for removing old vertex's index
+     */
+    Vertex updateVertex(Vertex oldVertex, Vertex newVertex);
+
     void removeVertex(Vertex vertex);
 
     void removeVertex(String label, Object id);
@@ -151,6 +214,11 @@ public interface HugeGraph extends Graph {
     <V> void removeVertexProperty(VertexProperty<V> property);
 
     Edge addEdge(Edge edge);
+
+    /**
+     * old edge is used for removing old edge's index
+     */
+    Edge updateEdge(Edge oldEdge, Edge newEdge);
 
     void canAddEdge(Edge edge);
 
@@ -162,37 +230,65 @@ public interface HugeGraph extends Graph {
 
     <V> void removeEdgeProperty(Property<V> property);
 
-    Vertex vertex(Object object);
+    Vertex vertex(Object id);
+
+    Vertex vertex(Object id, boolean skipCache);
 
     @Override
-    Iterator<Vertex> vertices(Object... objects);
+    Iterator<Vertex> vertices(Object... vertexIds);
+
+    Iterator<Vertex> vertices(boolean skipCache, Object... vertexIds);
 
     Iterator<Vertex> vertices(Query query);
 
     Iterator<Vertex> adjacentVertex(Object id);
 
+    Iterator<Vertex> adjacentVertexWithProp(Object... ids);
+
     boolean checkAdjacentVertexExist();
 
-    Edge edge(Object object);
+    Edge edge(Object id);
+
+    Edge edge(Object id, boolean skipCache);
 
     @Override
-    Iterator<Edge> edges(Object... objects);
+    Iterator<Edge> edges(Object... edgeIds);
+
+    Iterator<Edge> edges(boolean skipCache, Object... edgeIds);
 
     Iterator<Edge> edges(Query query);
 
+    Iterator<Iterator<Edge>> edges(Iterator<Query> queryList);
+
+    Iterator<EdgeId> edgeIds(Query query);
+
+    Iterator<Iterator<EdgeId>> edgeIds(Iterator<Query> queryList);
+
     Iterator<Vertex> adjacentVertices(Iterator<Edge> edges);
+
+    Iterator<Vertex> adjacentVertices(Iterator<Edge> edges, boolean withProperty);
 
     Iterator<Edge> adjacentEdges(Id vertexId);
 
     Number queryNumber(Query query);
 
+    List<KvElement> queryAgg(Query query);
+
+    String graphSpace();
+
+    void graphSpace(String graphSpace);
+
     String name();
+
+    String spaceGraphName();
 
     String backend();
 
-    BackendFeatures backendStoreFeatures();
+    String backendVersion();
 
-    BackendStoreInfo backendStoreInfo();
+    BackendStoreSystemInfo backendStoreSystemInfo();
+
+    BackendFeatures backendStoreFeatures();
 
     GraphMode mode();
 
@@ -204,11 +300,37 @@ public interface HugeGraph extends Graph {
 
     void waitReady(RpcServer rpcServer);
 
-    void serverStarted(GlobalMasterInfo nodeInfo);
+    String nickname();
+
+    void nickname(String nickname);
+
+    String creator();
+
+    void creator(String creator);
+
+    Date createTime();
+
+    void createTime(Date createTime);
+
+    Date updateTime();
+
+    void updateTime(Date updateTime);
+
+    void refreshUpdateTime();
+
+    void waitStarted();
+
+    void serverStarted();
 
     boolean started();
 
+    void started(boolean started);
+
     boolean closed();
+
+    void closeTx();
+
+    Vertex addVertex(Vertex vertex);
 
     <T> T metadata(HugeType type, String meta, Object... args);
 
@@ -217,6 +339,12 @@ public interface HugeGraph extends Graph {
     void clearBackend();
 
     void truncateBackend();
+
+    void truncateGraph();
+
+    void kvStore(KvStore kvStore);
+
+    KvStore kvStore();
 
     void initSystemInfo();
 
@@ -254,15 +382,6 @@ public interface HugeGraph extends Graph {
     void registerRpcServices(RpcServiceConfig4Server serverConfig,
                              RpcServiceConfig4Client clientConfig);
 
-    default List<String> mapPkId2Name(Collection<Id> ids) {
-        List<String> names = new ArrayList<>(ids.size());
-        for (Id id : ids) {
-            SchemaElement schema = this.propertyKey(id);
-            names.add(schema.name());
-        }
-        return names;
-    }
-
     default List<String> mapVlId2Name(Collection<Id> ids) {
         List<String> names = new ArrayList<>(ids.size());
         for (Id id : ids) {
@@ -276,15 +395,6 @@ public interface HugeGraph extends Graph {
         List<String> names = new ArrayList<>(ids.size());
         for (Id id : ids) {
             SchemaElement schema = this.edgeLabel(id);
-            names.add(schema.name());
-        }
-        return names;
-    }
-
-    default List<String> mapIlId2Name(Collection<Id> ids) {
-        List<String> names = new ArrayList<>(ids.size());
-        for (Id id : ids) {
-            SchemaElement schema = this.indexLabel(id);
             names.add(schema.name());
         }
         return names;
@@ -339,15 +449,14 @@ public interface HugeGraph extends Graph {
         return els;
     }
 
-    static void registerTraversalStrategies(Class<?> clazz) {
-        TraversalStrategies strategies = TraversalStrategies.GlobalCache
-                .getStrategies(Graph.class)
-                .clone();
-        strategies.addStrategies(HugeVertexStepStrategy.instance(),
-                                 HugeGraphStepStrategy.instance(),
-                                 HugeCountStepStrategy.instance(),
-                                 HugePrimaryKeyStrategy.instance());
+    void applyMutation(BackendMutation mutation);
 
-        TraversalStrategies.GlobalCache.registerStrategies(clazz, strategies);
+    // todo: zzz 有啥区别呢
+    default LoadMode getLoadMode() {
+        return LoadMode.NORMAL;
+    }
+
+    default void setLoadMode(LoadMode loadMode) {
+
     }
 }

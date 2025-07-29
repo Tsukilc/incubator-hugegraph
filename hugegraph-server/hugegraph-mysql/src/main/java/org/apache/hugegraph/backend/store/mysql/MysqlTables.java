@@ -25,12 +25,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.IdUtil;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.IdUtil;
+import org.apache.hugegraph.id.SplicingIdGenerator;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntryIterator;
 import org.apache.hugegraph.backend.store.TableDefine;
@@ -343,6 +343,19 @@ public class MysqlTables {
                              HugeKeys.OTHER_VERTEX);
         }
 
+        public static String table(Directions direction) {
+            assert direction == Directions.OUT || direction == Directions.IN;
+            return direction.type().string() + TABLE_SUFFIX;
+        }
+
+        public static MysqlTable out(String store) {
+            return new Edge(store, Directions.OUT);
+        }
+
+        public static MysqlTable in(String store) {
+            return new Edge(store, Directions.IN);
+        }
+
         @Override
         public List<Object> idColumnValue(Id id) {
             EdgeId edgeId;
@@ -438,19 +451,6 @@ public class MysqlTables {
 
             vertex.subRow(edge.row());
             return vertex;
-        }
-
-        public static String table(Directions direction) {
-            assert direction == Directions.OUT || direction == Directions.IN;
-            return direction.type().string() + TABLE_SUFFIX;
-        }
-
-        public static MysqlTable out(String store) {
-            return new Edge(store, Directions.OUT);
-        }
-
-        public static MysqlTable in(String store) {
-            return new Edge(store, Directions.IN);
         }
     }
 

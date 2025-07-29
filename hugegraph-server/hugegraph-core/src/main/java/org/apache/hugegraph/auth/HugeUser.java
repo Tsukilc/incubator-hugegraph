@@ -24,7 +24,7 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.auth.SchemaDefine.Entity;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.util.E;
 import org.apache.tinkerpop.gremlin.structure.Graph.Hidden;
@@ -57,6 +57,20 @@ public class HugeUser extends Entity {
         this.id = id;
         this.name = name;
         this.role = null;
+    }
+
+    public static HugeUser fromVertex(Vertex vertex) {
+        HugeUser user = new HugeUser((Id) vertex.id());
+        return fromVertex(vertex, user);
+    }
+
+    public static Schema schema(HugeGraphParams graph) {
+        return new Schema(graph);
+    }
+
+    public static HugeUser fromMap(Map<String, Object> map) {
+        HugeUser user = new HugeUser("");
+        return fromMap(map, user);
     }
 
     @Override
@@ -221,15 +235,6 @@ public class HugeUser extends Entity {
         return super.asMap(map);
     }
 
-    public static HugeUser fromVertex(Vertex vertex) {
-        HugeUser user = new HugeUser((Id) vertex.id());
-        return fromVertex(vertex, user);
-    }
-
-    public static Schema schema(HugeGraphParams graph) {
-        return new Schema(graph);
-    }
-
     public static final class P {
 
         public static final String USER = Hidden.hide("user");
@@ -288,10 +293,5 @@ public class HugeUser extends Entity {
 
             return super.initProperties(props);
         }
-    }
-
-    public static HugeUser fromMap(Map<String, Object> map) {
-        HugeUser user = new HugeUser("");
-        return fromMap(map, user);
     }
 }

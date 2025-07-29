@@ -22,10 +22,10 @@ import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.Condition.Relation;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.Condition.Relation;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.serializer.BinarySerializer;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry.BackendColumnIterator;
@@ -74,6 +74,19 @@ public class RocksDBTables {
             super(database, TABLE);
         }
 
+        private static byte[] toBytes(long value) {
+            return ByteBuffer.allocate(Long.BYTES)
+                             .order(ByteOrder.nativeOrder())
+                             .putLong(value).array();
+        }
+
+        private static long toLong(byte[] bytes) {
+            assert bytes.length == Long.BYTES;
+            return ByteBuffer.wrap(bytes)
+                             .order(ByteOrder.nativeOrder())
+                             .getLong();
+        }
+
         public long getCounter(RocksDBSessions.Session session, HugeType type) {
             byte[] key = new byte[]{type.code()};
             byte[] value = session.get(this.table(), key);
@@ -88,19 +101,6 @@ public class RocksDBTables {
                                     long increment) {
             byte[] key = new byte[]{type.code()};
             session.increase(this.table(), key, toBytes(increment));
-        }
-
-        private static byte[] toBytes(long value) {
-            return ByteBuffer.allocate(Long.BYTES)
-                             .order(ByteOrder.nativeOrder())
-                             .putLong(value).array();
-        }
-
-        private static long toLong(byte[] bytes) {
-            assert bytes.length == Long.BYTES;
-            return ByteBuffer.wrap(bytes)
-                             .order(ByteOrder.nativeOrder())
-                             .getLong();
         }
     }
 

@@ -25,15 +25,15 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageState;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Aggregate.AggregateFunc;
-import org.apache.hugegraph.backend.query.Condition.Relation;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Aggregate.AggregateFunc;
+import org.apache.hugegraph.query.Condition.Relation;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
 import org.apache.hugegraph.backend.serializer.BinaryEntryIterator;
 import org.apache.hugegraph.backend.store.BackendEntry;
@@ -62,6 +62,38 @@ public class RocksDBTable extends BackendTable<RocksDBSessions.Session, BackendE
     public RocksDBTable(String database, String table) {
         super(String.format("%s+%s", database, table));
         this.shardSplitter = new RocksDBShardSplitter(this.table());
+    }
+
+    protected static BackendEntryIterator newEntryIterator(BackendColumnIterator cols,
+                                                           Query query) {
+        return new BinaryEntryIterator<>(cols, query, (entry, col) -> {
+            if (entry == null || !entry.belongToMe(col)) {
+                HugeType type = query.resultType();
+                // NOTE: only support BinaryBackendEntry currently
+                entry = new BinaryBackendEntry(type, col.name);
+            } else {
+                assert !Bytes.equals(entry.id().asBytes(), col.name);
+            }
+            entry.columns(col);
+            return entry;
+        });
+    }
+
+    protected static BackendEntryIterator newEntryIteratorOlap(
+            BackendColumnIterator cols, Query query, boolean isOlap) {
+        return new BinaryEntryIterator<>(cols, query, (entry, col) -> {
+            if (entry == null || !entry.belongToMe(col)) {
+                HugeType type = query.resultType();
+                // NOTE: only support BinaryBackendEntry currently
+                entry = new BinaryBackendEntry(type, col.name, false, isOlap);
+            }
+            entry.columns(col);
+            return entry;
+        });
+    }
+
+    protected static long sizeOfBackendEntry(BackendEntry entry) {
+        return BinaryEntryIterator.sizeOfEntry(entry);
     }
 
     @Override
@@ -291,38 +323,6 @@ public class RocksDBTable extends BackendTable<RocksDBSessions.Session, BackendE
 
     public boolean isOlap() {
         return false;
-    }
-
-    protected static BackendEntryIterator newEntryIterator(BackendColumnIterator cols,
-                                                           Query query) {
-        return new BinaryEntryIterator<>(cols, query, (entry, col) -> {
-            if (entry == null || !entry.belongToMe(col)) {
-                HugeType type = query.resultType();
-                // NOTE: only support BinaryBackendEntry currently
-                entry = new BinaryBackendEntry(type, col.name);
-            } else {
-                assert !Bytes.equals(entry.id().asBytes(), col.name);
-            }
-            entry.columns(col);
-            return entry;
-        });
-    }
-
-    protected static BackendEntryIterator newEntryIteratorOlap(
-        BackendColumnIterator cols, Query query, boolean isOlap) {
-        return new BinaryEntryIterator<>(cols, query, (entry, col) -> {
-            if (entry == null || !entry.belongToMe(col)) {
-                HugeType type = query.resultType();
-                // NOTE: only support BinaryBackendEntry currently
-                entry = new BinaryBackendEntry(type, col.name, false, isOlap);
-            }
-            entry.columns(col);
-            return entry;
-        });
-    }
-
-    protected static long sizeOfBackendEntry(BackendEntry entry) {
-        return BinaryEntryIterator.sizeOfEntry(entry);
     }
 
     private static class RocksDBShardSplitter extends ShardSplitter<RocksDBSessions.Session> {

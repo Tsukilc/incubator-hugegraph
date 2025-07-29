@@ -25,8 +25,8 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.auth.HugeTarget.P;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.schema.IndexLabel;
 import org.apache.hugegraph.schema.PropertyKey;
 import org.apache.hugegraph.schema.SchemaManager;
@@ -49,6 +49,14 @@ public abstract class SchemaDefine {
     public SchemaDefine(HugeGraphParams graph, String label) {
         this.graph = graph;
         this.label = label;
+    }
+
+    protected static String hideField(String label, String key) {
+        return label + "_" + key;
+    }
+
+    protected static String unhideField(String label, String key) {
+        return Hidden.unHide(label) + "_" + key;
     }
 
     public abstract void initSchemaIfNeeded();
@@ -106,22 +114,12 @@ public abstract class SchemaDefine {
         return indexLabel;
     }
 
-    protected static String hideField(String label, String key) {
-        return label + "_" + key;
-    }
-
-    protected static String unhideField(String label, String key) {
-        return Hidden.unHide(label) + "_" + key;
-    }
-
     public abstract static class AuthElement implements Serializable {
-
-        private static final long serialVersionUID = 8746691160192814973L;
 
         protected static final String CREATE = "create";
         protected static final String UPDATE = "update";
         protected static final String CREATOR = "creator";
-
+        private static final long serialVersionUID = 8746691160192814973L;
         protected Id id;
         protected Date create;
         protected Date update;
@@ -280,19 +278,6 @@ public abstract class SchemaDefine {
 
         private static final long serialVersionUID = -1406157381685832493L;
 
-        public abstract String sourceLabel();
-
-        public abstract String targetLabel();
-
-        public abstract Id source();
-
-        public abstract Id target();
-
-        public void setId() {
-            this.id(IdGenerator.of(this.source().asString() + "->" +
-                                   this.target().asString()));
-        }
-
         public static <T extends Relationship> T fromMap(Map<String, Object> map, T entity) {
             for (Map.Entry<String, Object> item : map.entrySet()) {
                 entity.property(Hidden.hide(item.getKey()), item.getValue());
@@ -313,6 +298,19 @@ public abstract class SchemaDefine {
                 relationship.property(prop.key(), prop.value());
             }
             return relationship;
+        }
+
+        public abstract String sourceLabel();
+
+        public abstract String targetLabel();
+
+        public abstract Id source();
+
+        public abstract Id target();
+
+        public void setId() {
+            this.id(IdGenerator.of(this.source().asString() + "->" +
+                                   this.target().asString()));
         }
 
         @Override

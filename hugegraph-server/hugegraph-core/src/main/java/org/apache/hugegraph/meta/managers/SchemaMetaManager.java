@@ -33,8 +33,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.meta.MetaDriver;
 import org.apache.hugegraph.meta.PdMetaDriver;
 import org.apache.hugegraph.schema.EdgeLabel;
@@ -44,6 +44,7 @@ import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.util.JsonUtil;
 
 public class SchemaMetaManager extends AbstractMetaManager {
+
     private final HugeGraph graph;
 
     public SchemaMetaManager(MetaDriver metaDriver, String cluster, HugeGraph graph) {

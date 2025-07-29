@@ -27,8 +27,7 @@ import java.util.Scanner;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.api.filter.AuthenticationFilter;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.ServerOptions;
 import org.apache.hugegraph.masterelection.RoleElectionOptions;

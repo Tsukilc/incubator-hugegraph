@@ -27,8 +27,8 @@ import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.exception.NotAllowException;
@@ -46,16 +46,16 @@ import com.google.common.collect.ImmutableList;
 
 public class VertexLabelBuilder extends AbstractBuilder implements VertexLabel.Builder {
 
-    private Id id;
     private final String name;
-    private IdStrategy idStrategy;
     private final Set<String> properties;
     private final List<String> primaryKeys;
     private final Set<String> nullableKeys;
+    private final Userdata userdata;
+    private Id id;
+    private IdStrategy idStrategy;
     private long ttl;
     private String ttlStartTime;
     private Boolean enableLabelIndex;
-    private final Userdata userdata;
     private boolean checkExist;
 
     public VertexLabelBuilder(ISchemaTransaction transaction,
@@ -91,6 +91,14 @@ public class VertexLabelBuilder extends AbstractBuilder implements VertexLabel.B
         this.enableLabelIndex = copy.enableLabelIndex();
         this.userdata = new Userdata(copy.userdata());
         this.checkExist = false;
+    }
+
+    private static Set<String> mapPkId2Name(HugeGraph graph, Set<Id> ids) {
+        return new HashSet<>(graph.mapPkId2Name(ids));
+    }
+
+    private static List<String> mapPkId2Name(HugeGraph graph, List<Id> ids) {
+        return graph.mapPkId2Name(ids);
     }
 
     @Override
@@ -591,13 +599,5 @@ public class VertexLabelBuilder extends AbstractBuilder implements VertexLabel.B
                 throw new AssertionError(String.format(
                         "Unknown schema action '%s'", action));
         }
-    }
-
-    private static Set<String> mapPkId2Name(HugeGraph graph, Set<Id> ids) {
-        return new HashSet<>(graph.mapPkId2Name(ids));
-    }
-
-    private static List<String> mapPkId2Name(HugeGraph graph, List<Id> ids) {
-        return graph.mapPkId2Name(ids);
     }
 }

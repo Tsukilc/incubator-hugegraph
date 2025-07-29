@@ -44,8 +44,8 @@ import org.apache.hugegraph.auth.HugePermission;
 import org.apache.hugegraph.auth.HugeRole;
 import org.apache.hugegraph.auth.HugeTarget;
 import org.apache.hugegraph.auth.HugeUser;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.meta.MetaDriver;
 import org.apache.hugegraph.meta.MetaManager;
 import org.apache.hugegraph.util.E;
@@ -56,7 +56,6 @@ public class AuthMetaManager extends AbstractMetaManager {
     public AuthMetaManager(MetaDriver metaDriver, String cluster) {
         super(metaDriver, cluster);
     }
-
 
     public void createUser(HugeUser user) throws IOException {
         String result = this.metaDriver.get(userKey(user.name()));

@@ -22,10 +22,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.memory.InMemoryDBStoreProvider;
 import org.apache.hugegraph.backend.store.raft.RaftBackendStoreProvider;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.util.E;
 import org.apache.hugegraph.util.Log;

@@ -21,10 +21,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.Id.IdType;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.Id.IdType;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.IndexLabel;
 import org.apache.hugegraph.schema.PropertyKey;
@@ -61,6 +61,29 @@ public class HugeGryoModule {
                     new EdgeLabelKryoSerializer());
         io.register(GryoIo.class, IndexLabel.class,
                     new IndexLabelKryoSerializer());
+    }
+
+    private static void writeEntry(Kryo kryo,
+                                   Output output,
+                                   Map<HugeKeys, Object> schema) {
+        /* Write columns size and data */
+        output.writeInt(schema.keySet().size());
+        for (Map.Entry<HugeKeys, Object> entry : schema.entrySet()) {
+            kryo.writeObject(output, entry.getKey());
+            kryo.writeClassAndObject(output, entry.getValue());
+        }
+    }
+
+    @SuppressWarnings("unused")
+    private static Map<HugeKeys, Object> readEntry(Kryo kryo, Input input) {
+        int columnSize = input.readInt();
+        Map<HugeKeys, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i < columnSize; i++) {
+            HugeKeys key = kryo.readObject(input, HugeKeys.class);
+            Object val = kryo.readClassAndObject(input);
+            map.put(key, val);
+        }
+        return map;
     }
 
     static class OptionalSerializer extends Serializer<Optional<?>> {
@@ -115,29 +138,6 @@ public class HugeGryoModule {
             byte[] idBytes = input.readBytes(length);
             return EdgeId.parse(StringEncoding.decode(idBytes));
         }
-    }
-
-    private static void writeEntry(Kryo kryo,
-                                   Output output,
-                                   Map<HugeKeys, Object> schema) {
-        /* Write columns size and data */
-        output.writeInt(schema.keySet().size());
-        for (Map.Entry<HugeKeys, Object> entry : schema.entrySet()) {
-            kryo.writeObject(output, entry.getKey());
-            kryo.writeClassAndObject(output, entry.getValue());
-        }
-    }
-
-    @SuppressWarnings("unused")
-    private static Map<HugeKeys, Object> readEntry(Kryo kryo, Input input) {
-        int columnSize = input.readInt();
-        Map<HugeKeys, Object> map = new LinkedHashMap<>();
-        for (int i = 0; i < columnSize; i++) {
-            HugeKeys key = kryo.readObject(input, HugeKeys.class);
-            Object val = kryo.readClassAndObject(input);
-            map.put(key, val);
-        }
-        return map;
     }
 
     static class PropertyKeyKryoSerializer extends Serializer<PropertyKey> {

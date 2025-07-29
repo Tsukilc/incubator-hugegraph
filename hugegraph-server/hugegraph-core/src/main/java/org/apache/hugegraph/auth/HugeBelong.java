@@ -24,7 +24,7 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.auth.SchemaDefine.Relationship;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.Graph.Hidden;
@@ -47,6 +47,21 @@ public class HugeBelong extends Relationship {
         this.user = user;
         this.group = group;
         this.description = null;
+    }
+
+    public static HugeBelong fromEdge(Edge edge) {
+        HugeBelong belong = new HugeBelong((Id) edge.outVertex().id(),
+                                           (Id) edge.inVertex().id());
+        return fromEdge(edge, belong);
+    }
+
+    public static Schema schema(HugeGraphParams graph) {
+        return new Schema(graph);
+    }
+
+    public static HugeBelong fromMap(Map<String, Object> map) {
+        HugeBelong belong = new HugeBelong(null, null);
+        return fromMap(map, belong);
     }
 
     @Override
@@ -139,16 +154,6 @@ public class HugeBelong extends Relationship {
         return super.asMap(map);
     }
 
-    public static HugeBelong fromEdge(Edge edge) {
-        HugeBelong belong = new HugeBelong((Id) edge.outVertex().id(),
-                                           (Id) edge.inVertex().id());
-        return fromEdge(edge, belong);
-    }
-
-    public static Schema schema(HugeGraphParams graph) {
-        return new Schema(graph);
-    }
-
     public static final class P {
 
         public static final String BELONG = Hidden.hide("belong");
@@ -201,10 +206,5 @@ public class HugeBelong extends Relationship {
 
             return super.initProperties(props);
         }
-    }
-
-    public static HugeBelong fromMap(Map<String, Object> map) {
-        HugeBelong belong = new HugeBelong(null, null);
-        return fromMap(map, belong);
     }
 }

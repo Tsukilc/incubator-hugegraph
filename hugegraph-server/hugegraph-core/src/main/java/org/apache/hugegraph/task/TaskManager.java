@@ -26,7 +26,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.concurrent.PausableScheduledThreadPool;
 import org.apache.hugegraph.type.define.NodeRole;
@@ -39,42 +39,32 @@ import org.slf4j.Logger;
 
 public final class TaskManager {
 
-    private static final Logger LOG = Log.logger(TaskManager.class);
-
     public static final String TASK_WORKER_PREFIX = "task-worker";
     public static final String TASK_WORKER = TASK_WORKER_PREFIX + "-%d";
     public static final String TASK_DB_WORKER = "task-db-worker-%d";
     public static final String SERVER_INFO_DB_WORKER =
             "server-info-db-worker-%d";
     public static final String TASK_SCHEDULER = "task-scheduler-%d";
-
     public static final String OLAP_TASK_WORKER = "olap-task-worker-%d";
     public static final String SCHEMA_TASK_WORKER = "schema-task-worker-%d";
     public static final String EPHEMERAL_TASK_WORKER = "ephemeral-task-worker-%d";
     public static final String DISTRIBUTED_TASK_SCHEDULER = "distributed-scheduler-%d";
-
-    protected static final long SCHEDULE_PERIOD = 1000L; // unit ms
+    static final long SCHEDULE_PERIOD = 1000L; // unit ms
+    private static final Logger LOG = Log.logger(TaskManager.class);
     private static final long TX_CLOSE_TIMEOUT = 30L; // unit s
     private static final int THREADS = 4;
     private static final TaskManager MANAGER = new TaskManager(THREADS);
-
+    private static final ThreadLocal<String> CONTEXTS = new ThreadLocal<>();
     private final Map<HugeGraphParams, TaskScheduler> schedulers;
-
     private final ExecutorService taskExecutor;
     private final ExecutorService taskDbExecutor;
     private final ExecutorService serverInfoDbExecutor;
     private final PausableScheduledThreadPool schedulerExecutor;
-
     private final ExecutorService schemaTaskExecutor;
     private final ExecutorService olapTaskExecutor;
     private final ExecutorService ephemeralTaskExecutor;
     private final PausableScheduledThreadPool distributedSchedulerExecutor;
-
     private boolean enableRoleElected = false;
-
-    public static TaskManager instance() {
-        return MANAGER;
-    }
 
     private TaskManager(int pool) {
         this.schedulers = new ConcurrentHashMap<>();
@@ -107,11 +97,29 @@ public final class TaskManager {
                                                       TimeUnit.MILLISECONDS);
     }
 
+    public static TaskManager instance() {
+        return MANAGER;
+    }
+
+    static void resetContext() {
+        CONTEXTS.remove();
+    }
+
+    public static String getContext() {
+        return CONTEXTS.get();
+    }
+
+    static void setContext(String context) {
+        CONTEXTS.set(context);
+    }
+
     public void addScheduler(HugeGraphParams graph) {
         E.checkArgumentNotNull(graph, "The graph can't be null");
         LOG.info("Use {} as the scheduler of graph ({})",
                  graph.schedulerType(), graph.name());
-        // TODO: If the current service is bound to a specified non-DEFAULT graph space, the graph outside of the current graph space will no longer create task schedulers (graph space)
+        // TODO: If the current service is bound to a specified non-DEFAULT graph space, the
+        //  graph outside of the current graph space will no longer create task schedulers (graph
+        //  space)
         switch (graph.schedulerType()) {
             case "distributed": {
                 TaskScheduler scheduler =
@@ -205,6 +213,10 @@ public final class TaskManager {
         } catch (Exception e) {
             throw new HugeException("Exception when closing scheduler tx", e);
         }
+    }
+
+    public void forceRemoveScheduler(HugeGraphParams params) {
+        this.schedulers.remove(params);
     }
 
     private void closeDistributedSchedulerTx(HugeGraphParams graph) {
@@ -379,8 +391,8 @@ public final class TaskManager {
         }
     }
 
-    protected void notifyNewTask(HugeTask<?> task) {
-        Queue<Runnable> queue = ((ThreadPoolExecutor) this.schedulerExecutor)
+    void notifyNewTask(HugeTask<?> task) {
+        Queue<Runnable> queue = this.schedulerExecutor
                 .getQueue();
         if (queue.size() <= 1) {
             /*
@@ -463,20 +475,6 @@ public final class TaskManager {
                 LockUtil.unlock(graph, LockUtil.GRAPH_LOCK);
             }
         }
-    }
-
-    private static final ThreadLocal<String> CONTEXTS = new ThreadLocal<>();
-
-    protected static void setContext(String context) {
-        CONTEXTS.set(context);
-    }
-
-    protected static void resetContext() {
-        CONTEXTS.remove();
-    }
-
-    public static String getContext() {
-        return CONTEXTS.get();
     }
 
     public static class ContextCallable<V> implements Callable<V> {

@@ -21,8 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.serializer.BytesBuffer;
 import org.apache.hugegraph.rocksdb.access.RocksDBSession.BackendColumn;
 import org.apache.hugegraph.rocksdb.access.ScanIterator;
 import org.apache.hugegraph.type.define.DataType;

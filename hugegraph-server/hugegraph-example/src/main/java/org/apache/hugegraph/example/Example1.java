@@ -23,9 +23,9 @@ import java.util.List;
 
 import org.apache.hugegraph.HugeFactory;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.PropertyKey;

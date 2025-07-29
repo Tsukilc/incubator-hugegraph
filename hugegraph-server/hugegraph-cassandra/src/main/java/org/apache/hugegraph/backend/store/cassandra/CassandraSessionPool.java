@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.BackendSession.AbstractBackendSession;
 import org.apache.hugegraph.backend.store.BackendSessionPool;
 import org.apache.hugegraph.config.HugeConfig;

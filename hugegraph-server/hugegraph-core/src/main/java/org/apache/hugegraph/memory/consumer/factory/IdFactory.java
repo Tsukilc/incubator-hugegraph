@@ -20,10 +20,10 @@ package org.apache.hugegraph.memory.consumer.factory;
 import java.util.UUID;
 
 import org.apache.hugegraph.backend.cache.CachedBackendStore;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
 import org.apache.hugegraph.memory.MemoryManager;
 import org.apache.hugegraph.memory.consumer.OffHeapObject;
@@ -45,6 +45,14 @@ public class IdFactory {
 
     private IdFactory() {
         // empty constructor
+    }
+
+    public static IdFactory getInstance() {
+        IdFactory instance = IdFactoryHolder.INSTANCE;
+        if (instance.memoryMode == null) {
+            instance.memoryMode = MemoryManager.getMemoryMode();
+        }
+        return IdFactoryHolder.INSTANCE;
     }
 
     /**
@@ -316,13 +324,5 @@ public class IdFactory {
         private IdFactoryHolder() {
             // empty constructor
         }
-    }
-
-    public static IdFactory getInstance() {
-        IdFactory instance = IdFactoryHolder.INSTANCE;
-        if (instance.memoryMode == null) {
-            instance.memoryMode = MemoryManager.getMemoryMode();
-        }
-        return IdFactoryHolder.INSTANCE;
     }
 }

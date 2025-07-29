@@ -18,7 +18,7 @@
 package org.apache.hugegraph.job.schema;
 
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
 import org.apache.hugegraph.schema.IndexLabel;
@@ -26,23 +26,6 @@ import org.apache.hugegraph.type.define.SchemaStatus;
 import org.apache.hugegraph.util.LockUtil;
 
 public class OlapPropertyKeyClearJob extends IndexLabelRemoveJob {
-
-    @Override
-    public String type() {
-        return CLEAR_OLAP;
-    }
-
-    @Override
-    public Object execute() {
-        Id olap = this.schemaId();
-
-        // Clear olap data table
-        this.params().graphTransaction().clearOlapPk(olap);
-
-        // Clear corresponding index data
-        clearIndexLabel(this.params(), olap);
-        return null;
-    }
 
     protected static void clearIndexLabel(HugeGraphParams graph, Id id) {
         Id olapIndexLabel = findOlapIndexLabel(graph, id);
@@ -86,6 +69,23 @@ public class OlapPropertyKeyClearJob extends IndexLabelRemoveJob {
                 return indexLabel.id();
             }
         }
+        return null;
+    }
+
+    @Override
+    public String type() {
+        return CLEAR_OLAP;
+    }
+
+    @Override
+    public Object execute() {
+        Id olap = this.schemaId();
+
+        // Clear olap data table
+        this.params().graphTransaction().clearOlapPk(olap);
+
+        // Clear corresponding index data
+        clearIndexLabel(this.params(), olap);
         return null;
     }
 }

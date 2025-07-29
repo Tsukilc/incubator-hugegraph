@@ -23,9 +23,9 @@ import java.util.function.Consumer;
 
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.exception.NotAllowException;
 import org.apache.hugegraph.job.JobBuilder;
 import org.apache.hugegraph.job.schema.EdgeLabelRemoveJob;
@@ -73,8 +73,8 @@ public class SchemaTransactionV2 implements ISchemaTransaction {
     private final SchemaMetaManager schemaMetaManager;
 
     public SchemaTransactionV2(MetaDriver metaDriver,
-                             String cluster,
-                             HugeGraphParams graphParams) {
+                               String cluster,
+                               HugeGraphParams graphParams) {
         E.checkNotNull(graphParams, "graphParams");
         this.graphParams = graphParams;
         // TODO: uncomment later - graph space
@@ -106,8 +106,8 @@ public class SchemaTransactionV2 implements ISchemaTransaction {
                                SchemaJob job, Set<Id> dependencies) {
         E.checkArgument(schema != null, "Schema can't be null");
         String name = SchemaJob.formatTaskName(schema.type(),
-                                                    schema.id(),
-                                                    schema.name());
+                                               schema.id(),
+                                               schema.name());
 
         JobBuilder<Object> builder = JobBuilder.of(graph).name(name)
                                                .job(job)
@@ -386,7 +386,7 @@ public class SchemaTransactionV2 implements ISchemaTransaction {
 
         if (baseLabel == null) {
             LOG.info("The base label '{}' of index label '{}' " +
-                "may be deleted before", baseValue, indexLabel);
+                     "may be deleted before", baseValue, indexLabel);
             return;
         }
         if (baseLabel.equals(VertexLabel.OLAP_VL)) {
@@ -439,14 +439,16 @@ public class SchemaTransactionV2 implements ISchemaTransaction {
                     this.schemaMetaManager.addVertexLabel(this.graphSpace,
                                                           this.graph,
                                                           (VertexLabel) schema);
-                    // Point's label changes, clear the corresponding graph's point cache information
+                    // Point's label changes, clear the corresponding graph's point cache
+                    // information
                     MetaManager.instance().notifyGraphVertexCacheClear(this.graphSpace, this.graph);
                     break;
                 case EDGE_LABEL:
                     this.schemaMetaManager.addEdgeLabel(this.graphSpace,
                                                         this.graph,
                                                         (EdgeLabel) schema);
-                    // Side label changes, clear the corresponding edge cache information of the graph.
+                    // Side label changes, clear the corresponding edge cache information of the
+                    // graph.
                     MetaManager.instance().notifyGraphEdgeCacheClear(this.graphSpace, this.graph);
                     break;
                 case INDEX_LABEL:

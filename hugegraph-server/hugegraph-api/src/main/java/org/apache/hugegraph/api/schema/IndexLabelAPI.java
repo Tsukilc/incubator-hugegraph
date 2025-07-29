@@ -27,7 +27,7 @@ import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.RedirectFilter;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.define.Checkable;
 import org.apache.hugegraph.schema.IndexLabel;
@@ -65,6 +65,25 @@ import jakarta.ws.rs.core.Context;
 public class IndexLabelAPI extends API {
 
     private static final Logger LOG = Log.logger(IndexLabelAPI.class);
+
+    private static List<IndexLabel> mapIndexLabels(List<IndexLabel> labels) {
+        List<IndexLabel> results = new ArrayList<>(labels.size());
+        for (IndexLabel il : labels) {
+            results.add(mapIndexLabel(il));
+        }
+        return results;
+    }
+
+    /**
+     * Map RANGE_INT/RANGE_FLOAT/RANGE_LONG/RANGE_DOUBLE to RANGE
+     */
+    private static IndexLabel mapIndexLabel(IndexLabel label) {
+        if (label.indexType().isRange()) {
+            label = (IndexLabel) label.copy();
+            label.indexType(IndexType.RANGE);
+        }
+        return label;
+    }
 
     @POST
     @Timed
@@ -172,25 +191,6 @@ public class IndexLabelAPI extends API {
         g.schema().getIndexLabel(name);
         return ImmutableMap.of("task_id",
                                g.schema().indexLabel(name).remove());
-    }
-
-    private static List<IndexLabel> mapIndexLabels(List<IndexLabel> labels) {
-        List<IndexLabel> results = new ArrayList<>(labels.size());
-        for (IndexLabel il : labels) {
-            results.add(mapIndexLabel(il));
-        }
-        return results;
-    }
-
-    /**
-     * Map RANGE_INT/RANGE_FLOAT/RANGE_LONG/RANGE_DOUBLE to RANGE
-     */
-    private static IndexLabel mapIndexLabel(IndexLabel label) {
-        if (label.indexType().isRange()) {
-            label = (IndexLabel) label.copy();
-            label.indexType(IndexType.RANGE);
-        }
-        return label;
     }
 
     /**

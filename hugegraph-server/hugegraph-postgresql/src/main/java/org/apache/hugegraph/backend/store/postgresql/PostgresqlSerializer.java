@@ -17,7 +17,7 @@
 
 package org.apache.hugegraph.backend.store.postgresql;
 
-import org.apache.hugegraph.backend.id.IdUtil;
+import org.apache.hugegraph.id.IdUtil;
 import org.apache.hugegraph.backend.serializer.TableBackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.mysql.MysqlSerializer;

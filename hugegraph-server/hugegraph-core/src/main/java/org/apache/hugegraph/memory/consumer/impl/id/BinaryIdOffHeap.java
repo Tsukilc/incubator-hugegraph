@@ -20,7 +20,7 @@ package org.apache.hugegraph.memory.consumer.impl.id;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
 import org.apache.hugegraph.memory.consumer.OffHeapObject;
 import org.apache.hugegraph.memory.pool.MemoryPool;

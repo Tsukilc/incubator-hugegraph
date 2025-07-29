@@ -20,12 +20,12 @@ package org.apache.hugegraph.schema.builder;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.exception.NotAllowException;
 import org.apache.hugegraph.exception.NotFoundException;
@@ -43,14 +43,14 @@ import org.apache.hugegraph.util.E;
 
 public class PropertyKeyBuilder extends AbstractBuilder implements PropertyKey.Builder {
 
-    private Id id;
     private final String name;
+    private final Userdata userdata;
+    private Id id;
     private DataType dataType;
     private Cardinality cardinality;
     private AggregateType aggregateType;
     private WriteType writeType;
     private boolean checkExist;
-    private final Userdata userdata;
 
     public PropertyKeyBuilder(ISchemaTransaction transaction,
                               HugeGraph graph, String name) {

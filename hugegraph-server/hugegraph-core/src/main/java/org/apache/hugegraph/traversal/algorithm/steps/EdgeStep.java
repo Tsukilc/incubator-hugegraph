@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.traversal.algorithm.HugeTraverser;
 import org.apache.hugegraph.traversal.optimize.TraversalUtil;
@@ -39,11 +39,11 @@ import com.google.common.collect.ImmutableMap;
 
 public class EdgeStep {
 
-    protected Directions direction;
     protected final Map<Id, String> labels;
     protected final Map<Id, Object> properties;
     protected final long degree;
     protected final long skipDegree;
+    protected Directions direction;
 
     public EdgeStep(HugeGraph g, Directions direction) {
         this(g, direction, ImmutableList.of());

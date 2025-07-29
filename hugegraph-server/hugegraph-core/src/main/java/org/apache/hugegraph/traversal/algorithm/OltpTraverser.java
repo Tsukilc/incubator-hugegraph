@@ -30,10 +30,10 @@ import java.util.function.Consumer;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.query.EdgesQueryIterator;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.iterator.FilterIterator;
 import org.apache.hugegraph.iterator.MapperIterator;
 import org.apache.hugegraph.structure.HugeEdge;
@@ -71,11 +71,6 @@ public abstract class OltpTraverser extends HugeTraverser
         }
     }
 
-    @Override
-    public void close() {
-        // pass
-    }
-
     public static void destroy() {
         synchronized (OltpTraverser.class) {
             if (executors != null) {
@@ -83,6 +78,11 @@ public abstract class OltpTraverser extends HugeTraverser
                 executors = null;
             }
         }
+    }
+
+    @Override
+    public void close() {
+        // pass
     }
 
     protected long traversePairs(Iterator<Pair<Id, Id>> pairs,

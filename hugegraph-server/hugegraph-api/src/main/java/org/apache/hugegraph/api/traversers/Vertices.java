@@ -24,9 +24,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.schema.SchemaLabel;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.structure.HugeVertex;
 import org.apache.hugegraph.traversal.optimize.TraversalUtil;
 import org.apache.hugegraph.type.HugeType;
@@ -67,7 +66,8 @@ public class Vertices {
         } else {
             ConditionQuery query = new ConditionQuery(HugeType.VERTEX);
             if (this.label != null) {
-                Id label = SchemaLabel.getVertexLabelId(g, this.label);
+                //todo:zzz
+                //Id label = SchemaLabel.getVertexLabelId(g, this.label);
                 query.eq(HugeKeys.LABEL, label);
             }
             if (props != null && !props.isEmpty()) {

@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hugegraph.HugeException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.exception.HugeException;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.iterator.ExtendableIterator;
 import org.apache.hugegraph.perf.PerfUtil.Watched;
 import org.apache.hugegraph.type.HugeType;
@@ -42,6 +42,13 @@ public class BackendMutation {
 
     public BackendMutation(int initialCapacity) {
         this.updates = new MutationTable(initialCapacity);
+    }
+
+    private static HugeException incompatibleActionException(
+            Action newAction,
+            Action originAction) {
+        return new HugeException("The action '%s' is incompatible with " +
+                                 "action '%s'", newAction, originAction);
     }
 
     /**
@@ -144,13 +151,6 @@ public class BackendMutation {
         if (!ignoreCurrent) {
             items.add(BackendAction.of(action, entry));
         }
-    }
-
-    private static HugeException incompatibleActionException(
-            Action newAction,
-            Action originAction) {
-        return new HugeException("The action '%s' is incompatible with " +
-                                 "action '%s'", newAction, originAction);
     }
 
     /**
@@ -266,6 +266,10 @@ public class BackendMutation {
         return String.format("BackendMutation{mutations=%s}", this.updates);
     }
 
+    public Map<HugeType, Map<Id, List<BackendAction>>> mutations() {
+        return this.updates.mutations;
+    }
+
     private static class MutationTable {
 
         // Mapping type => id => mutations
@@ -349,9 +353,5 @@ public class BackendMutation {
         public void clear() {
             this.mutations.clear();
         }
-    }
-
-    public Map<HugeType, Map<Id, List<BackendAction>>> mutations() {
-        return this.updates.mutations;
     }
 }

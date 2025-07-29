@@ -36,29 +36,29 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.SplicingIdGenerator;
 import org.apache.hugegraph.backend.page.IdHolderList;
 import org.apache.hugegraph.backend.page.PageInfo;
 import org.apache.hugegraph.backend.page.QueryList;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Aggregate.AggregateFunc;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.ConditionQuery.OptimizedType;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Aggregate.AggregateFunc;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.ConditionQuery.OptimizedType;
 import org.apache.hugegraph.backend.query.ConditionQueryFlatten;
-import org.apache.hugegraph.backend.query.IdQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.IdQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendMutation;
 import org.apache.hugegraph.backend.store.BackendStore;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.exception.LimitExceedException;
 import org.apache.hugegraph.exception.NotFoundException;
@@ -109,25 +109,12 @@ import jakarta.ws.rs.ForbiddenException;
 public class GraphTransaction extends IndexableTransaction {
 
     public static final int COMMIT_BATCH = (int) Query.COMMIT_BATCH;
-
+    protected static final ConcurrentHashMap<String, Boolean> graphCacheListenStatus =
+            new ConcurrentHashMap<>();
+    protected static final ConcurrentHashMap<String, Boolean> storeEventListenStatus =
+            new ConcurrentHashMap<>();
     private final GraphIndexTransaction indexTx;
-
-    private Map<Id, HugeVertex> addedVertices;
-    private Map<Id, HugeVertex> removedVertices;
-
-    private Map<Id, HugeEdge> addedEdges;
-    private Map<Id, HugeEdge> removedEdges;
-
-    private Set<HugeProperty<?>> addedProps;
-    private Set<HugeProperty<?>> removedProps;
-
-    // These are used to rollback state
-    private Map<Id, HugeVertex> updatedVertices;
-    private Map<Id, HugeEdge> updatedEdges;
-    private Set<HugeProperty<?>> updatedOldestProps; // Oldest props
-
     private final LockUtil.LocksTable locksTable;
-
     private final boolean checkCustomVertexExist;
     private final boolean checkAdjacentVertexExist;
     private final boolean lazyLoadAdjacentVertex;
@@ -137,13 +124,18 @@ public class GraphTransaction extends IndexableTransaction {
     private final int commitPartOfAdjacentEdges;
     private final int batchSize;
     private final int pageSize;
-
     private final int verticesCapacity;
     private final int edgesCapacity;
-    protected static final ConcurrentHashMap<String, Boolean> graphCacheListenStatus =
-            new ConcurrentHashMap<>();
-    protected static final ConcurrentHashMap<String, Boolean> storeEventListenStatus =
-            new ConcurrentHashMap<>();
+    private Map<Id, HugeVertex> addedVertices;
+    private Map<Id, HugeVertex> removedVertices;
+    private Map<Id, HugeEdge> addedEdges;
+    private Map<Id, HugeEdge> removedEdges;
+    private Set<HugeProperty<?>> addedProps;
+    private Set<HugeProperty<?>> removedProps;
+    // These are used to rollback state
+    private Map<Id, HugeVertex> updatedVertices;
+    private Map<Id, HugeEdge> updatedEdges;
+    private Set<HugeProperty<?>> updatedOldestProps; // Oldest props
 
     public GraphTransaction(HugeGraphParams graph, BackendStore store) {
         super(graph, store);
@@ -180,6 +172,215 @@ public class GraphTransaction extends IndexableTransaction {
                         this.commitPartOfAdjacentEdges,
                         CoreOptions.EDGE_TX_CAPACITY.name(),
                         this.edgesCapacity);
+    }
+
+    /**
+     * Construct one-edge condition query based on source vertex, direction and
+     * edge labels
+     *
+     * @param sourceVertex source vertex of edge
+     * @param direction    only be "IN", "OUT" or "BOTH"
+     * @param edgeLabels   edge labels of queried edges
+     * @return constructed condition query
+     */
+    @Watched
+    public static ConditionQuery constructEdgesQuery(Id sourceVertex,
+                                                     Directions direction,
+                                                     Id... edgeLabels) {
+        return constructEdgesQuery(sourceVertex, direction, List.of(edgeLabels));
+    }
+
+    @Watched
+    public static ConditionQuery constructEdgesQuery(Id sourceVertex,
+                                                     Directions direction,
+                                                     EdgeLabel... edgeLabels) {
+        E.checkState(sourceVertex != null,
+                     "The edge query must contain source vertex");
+        E.checkState(direction != null,
+                     "The edge query must contain direction");
+
+        ConditionQuery query = new ConditionQuery(HugeType.EDGE);
+
+        // Edge source vertex
+        query.eq(HugeKeys.OWNER_VERTEX, sourceVertex);
+
+        // Edge direction
+        if (direction == Directions.BOTH) {
+            query.query(Condition.or(
+                    Condition.eq(HugeKeys.DIRECTION, Directions.OUT),
+                    Condition.eq(HugeKeys.DIRECTION, Directions.IN)));
+        } else {
+            assert direction == Directions.OUT || direction == Directions.IN;
+            query.eq(HugeKeys.DIRECTION, direction);
+        }
+
+        // Edge labels
+        if (edgeLabels.length == 1) {
+            EdgeLabel edgeLabel = edgeLabels[0];
+            if (edgeLabel.hasFather()) {
+                query.eq(HugeKeys.LABEL, edgeLabel.fatherId());
+                query.eq(HugeKeys.SUB_LABEL, edgeLabel.id());
+            } else {
+                query.eq(HugeKeys.LABEL, edgeLabel.id());
+            }
+        } else if (edgeLabels.length >= 1) {
+            query.query(
+                    Condition.in(HugeKeys.LABEL,
+                                 Arrays.stream(edgeLabels)
+                                       .map(SchemaElement::id)
+                                       .collect(Collectors.toList())));
+        }
+
+        return query;
+    }
+
+    private static ConditionQuery constructEdgesQuery(Id sourceVertex,
+                                                      Directions direction,
+                                                      List<Id> edgeLabels) {
+        E.checkState(sourceVertex != null,
+                     "The edge query must contain source vertex");
+        E.checkState(direction != null,
+                     "The edge query must contain direction");
+
+        ConditionQuery query = new ConditionQuery(HugeType.EDGE);
+
+        // Edge source vertex
+        query.eq(HugeKeys.OWNER_VERTEX, sourceVertex);
+
+        // Edge direction
+        if (direction == Directions.BOTH) {
+            query.query(Condition.or(
+                    Condition.eq(HugeKeys.DIRECTION, Directions.OUT),
+                    Condition.eq(HugeKeys.DIRECTION, Directions.IN)));
+        } else {
+            assert direction == Directions.OUT || direction == Directions.IN;
+            query.eq(HugeKeys.DIRECTION, direction);
+        }
+
+        // Edge labels
+        if (edgeLabels.size() == 1) {
+            query.eq(HugeKeys.LABEL, edgeLabels.get(0));
+        } else if (edgeLabels.size() > 1) {
+            query.query(Condition.in(HugeKeys.LABEL, edgeLabels));
+        }
+
+        return query;
+    }
+
+    public static boolean matchFullEdgeSortKeys(ConditionQuery query,
+                                                HugeGraph graph) {
+        // All queryKeys in sortKeys
+        return matchEdgeSortKeys(query, true, graph);
+    }
+
+    public static boolean matchPartialEdgeSortKeys(ConditionQuery query,
+                                                   HugeGraph graph) {
+        // Partial queryKeys in sortKeys
+        return matchEdgeSortKeys(query, false, graph);
+    }
+
+    private static boolean matchEdgeSortKeys(ConditionQuery query,
+                                             boolean matchAll,
+                                             HugeGraph graph) {
+        assert query.resultType().isEdge();
+        Id label = query.condition(HugeKeys.LABEL);
+        if (label == null) {
+            return false;
+        }
+        List<Id> sortKeys = graph.edgeLabel(label).sortKeys();
+        if (sortKeys.isEmpty()) {
+            return false;
+        }
+        Set<Id> queryKeys = query.userpropKeys();
+        for (int i = sortKeys.size(); i > 0; i--) {
+            List<Id> subFields = sortKeys.subList(0, i);
+            if (queryKeys.containsAll(subFields)) {
+                if (queryKeys.size() == subFields.size() || !matchAll) {
+                    /*
+                     * Return true if:
+                     * matchAll=true and all queryKeys are in sortKeys
+                     *  or
+                     * partial queryKeys are in sortKeys
+                     */
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void verifyVerticesConditionQuery(ConditionQuery query) {
+        assert query.resultType().isVertex();
+
+        int total = query.conditionsSize();
+        if (total == 1) {
+            /*
+             * Supported query:
+             *  1.query just by vertex label
+             *  2.query just by PROPERTIES (like containsKey,containsValue)
+             *  3.query with scan
+             */
+            if (query.containsCondition(HugeKeys.LABEL) ||
+                query.containsCondition(HugeKeys.PROPERTIES) ||
+                query.containsScanRelation()) {
+                return;
+            }
+        }
+
+        int matched = 0;
+        if (query.containsCondition(HugeKeys.PROPERTIES)) {
+            matched++;
+            if (query.containsCondition(HugeKeys.LABEL)) {
+                matched++;
+            }
+        }
+
+        if (matched != total) {
+            throw new HugeException("Not supported querying vertices by %s",
+                                    query.conditions());
+        }
+    }
+
+    private static void verifyEdgesConditionQuery(ConditionQuery query) {
+        assert query.resultType().isEdge();
+
+        int total = query.conditionsSize();
+        if (total == 1) {
+            /*
+             * Supported query:
+             *  1.query just by edge label
+             *  2.query just by PROPERTIES (like containsKey, containsValue)
+             *  3.query with scan
+             */
+            if (query.containsCondition(HugeKeys.LABEL) ||
+                query.containsCondition(HugeKeys.PROPERTIES) ||
+                query.containsScanRelation()) {
+                return;
+            }
+        }
+
+        int matched = 0;
+        for (HugeKeys key : EdgeId.KEYS) {
+            Object value = query.condition(key);
+            if (value == null) {
+                break;
+            }
+            matched++;
+        }
+        int count = matched;
+
+        if (query.containsCondition(HugeKeys.PROPERTIES)) {
+            matched++;
+            if (count < 3 && query.containsCondition(HugeKeys.LABEL)) {
+                matched++;
+            }
+        }
+
+        if (matched != total) {
+            throw new HugeException(
+                    "Not supported querying edges by %s, expect %s",
+                    query.conditions(), EdgeId.KEYS[count]);
+        }
     }
 
     @Override
@@ -1279,215 +1480,6 @@ public class GraphTransaction extends IndexableTransaction {
         });
     }
 
-    /**
-     * Construct one-edge condition query based on source vertex, direction and
-     * edge labels
-     *
-     * @param sourceVertex source vertex of edge
-     * @param direction    only be "IN", "OUT" or "BOTH"
-     * @param edgeLabels   edge labels of queried edges
-     * @return constructed condition query
-     */
-    @Watched
-    public static ConditionQuery constructEdgesQuery(Id sourceVertex,
-                                                     Directions direction,
-                                                     Id... edgeLabels) {
-        return constructEdgesQuery(sourceVertex, direction, List.of(edgeLabels));
-    }
-
-    @Watched
-    public static ConditionQuery constructEdgesQuery(Id sourceVertex,
-                                                     Directions direction,
-                                                     EdgeLabel... edgeLabels) {
-        E.checkState(sourceVertex != null,
-                     "The edge query must contain source vertex");
-        E.checkState(direction != null,
-                     "The edge query must contain direction");
-
-        ConditionQuery query = new ConditionQuery(HugeType.EDGE);
-
-        // Edge source vertex
-        query.eq(HugeKeys.OWNER_VERTEX, sourceVertex);
-
-        // Edge direction
-        if (direction == Directions.BOTH) {
-            query.query(Condition.or(
-                    Condition.eq(HugeKeys.DIRECTION, Directions.OUT),
-                    Condition.eq(HugeKeys.DIRECTION, Directions.IN)));
-        } else {
-            assert direction == Directions.OUT || direction == Directions.IN;
-            query.eq(HugeKeys.DIRECTION, direction);
-        }
-
-        // Edge labels
-        if (edgeLabels.length == 1) {
-            EdgeLabel edgeLabel = edgeLabels[0];
-            if (edgeLabel.hasFather()) {
-                query.eq(HugeKeys.LABEL, edgeLabel.fatherId());
-                query.eq(HugeKeys.SUB_LABEL, edgeLabel.id());
-            } else {
-                query.eq(HugeKeys.LABEL, edgeLabel.id());
-            }
-        } else if (edgeLabels.length >= 1) {
-            query.query(
-                    Condition.in(HugeKeys.LABEL,
-                                 Arrays.stream(edgeLabels)
-                                       .map(SchemaElement::id)
-                                       .collect(Collectors.toList())));
-        }
-
-        return query;
-    }
-
-    private static ConditionQuery constructEdgesQuery(Id sourceVertex,
-                                                      Directions direction,
-                                                      List<Id> edgeLabels) {
-        E.checkState(sourceVertex != null,
-                     "The edge query must contain source vertex");
-        E.checkState(direction != null,
-                     "The edge query must contain direction");
-
-        ConditionQuery query = new ConditionQuery(HugeType.EDGE);
-
-        // Edge source vertex
-        query.eq(HugeKeys.OWNER_VERTEX, sourceVertex);
-
-        // Edge direction
-        if (direction == Directions.BOTH) {
-            query.query(Condition.or(
-                    Condition.eq(HugeKeys.DIRECTION, Directions.OUT),
-                    Condition.eq(HugeKeys.DIRECTION, Directions.IN)));
-        } else {
-            assert direction == Directions.OUT || direction == Directions.IN;
-            query.eq(HugeKeys.DIRECTION, direction);
-        }
-
-        // Edge labels
-        if (edgeLabels.size() == 1) {
-            query.eq(HugeKeys.LABEL, edgeLabels.get(0));
-        } else if (edgeLabels.size() > 1) {
-            query.query(Condition.in(HugeKeys.LABEL, edgeLabels));
-        }
-
-        return query;
-    }
-
-    public static boolean matchFullEdgeSortKeys(ConditionQuery query,
-                                                HugeGraph graph) {
-        // All queryKeys in sortKeys
-        return matchEdgeSortKeys(query, true, graph);
-    }
-
-    public static boolean matchPartialEdgeSortKeys(ConditionQuery query,
-                                                   HugeGraph graph) {
-        // Partial queryKeys in sortKeys
-        return matchEdgeSortKeys(query, false, graph);
-    }
-
-    private static boolean matchEdgeSortKeys(ConditionQuery query,
-                                             boolean matchAll,
-                                             HugeGraph graph) {
-        assert query.resultType().isEdge();
-        Id label = query.condition(HugeKeys.LABEL);
-        if (label == null) {
-            return false;
-        }
-        List<Id> sortKeys = graph.edgeLabel(label).sortKeys();
-        if (sortKeys.isEmpty()) {
-            return false;
-        }
-        Set<Id> queryKeys = query.userpropKeys();
-        for (int i = sortKeys.size(); i > 0; i--) {
-            List<Id> subFields = sortKeys.subList(0, i);
-            if (queryKeys.containsAll(subFields)) {
-                if (queryKeys.size() == subFields.size() || !matchAll) {
-                    /*
-                     * Return true if:
-                     * matchAll=true and all queryKeys are in sortKeys
-                     *  or
-                     * partial queryKeys are in sortKeys
-                     */
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static void verifyVerticesConditionQuery(ConditionQuery query) {
-        assert query.resultType().isVertex();
-
-        int total = query.conditionsSize();
-        if (total == 1) {
-            /*
-             * Supported query:
-             *  1.query just by vertex label
-             *  2.query just by PROPERTIES (like containsKey,containsValue)
-             *  3.query with scan
-             */
-            if (query.containsCondition(HugeKeys.LABEL) ||
-                query.containsCondition(HugeKeys.PROPERTIES) ||
-                query.containsScanRelation()) {
-                return;
-            }
-        }
-
-        int matched = 0;
-        if (query.containsCondition(HugeKeys.PROPERTIES)) {
-            matched++;
-            if (query.containsCondition(HugeKeys.LABEL)) {
-                matched++;
-            }
-        }
-
-        if (matched != total) {
-            throw new HugeException("Not supported querying vertices by %s",
-                                    query.conditions());
-        }
-    }
-
-    private static void verifyEdgesConditionQuery(ConditionQuery query) {
-        assert query.resultType().isEdge();
-
-        int total = query.conditionsSize();
-        if (total == 1) {
-            /*
-             * Supported query:
-             *  1.query just by edge label
-             *  2.query just by PROPERTIES (like containsKey, containsValue)
-             *  3.query with scan
-             */
-            if (query.containsCondition(HugeKeys.LABEL) ||
-                query.containsCondition(HugeKeys.PROPERTIES) ||
-                query.containsScanRelation()) {
-                return;
-            }
-        }
-
-        int matched = 0;
-        for (HugeKeys key : EdgeId.KEYS) {
-            Object value = query.condition(key);
-            if (value == null) {
-                break;
-            }
-            matched++;
-        }
-        int count = matched;
-
-        if (query.containsCondition(HugeKeys.PROPERTIES)) {
-            matched++;
-            if (count < 3 && query.containsCondition(HugeKeys.LABEL)) {
-                matched++;
-            }
-        }
-
-        if (matched != total) {
-            throw new HugeException(
-                    "Not supported querying edges by %s, expect %s",
-                    query.conditions(), EdgeId.KEYS[count]);
-        }
-    }
-
     private <R> QueryList<R> optimizeQueries(Query query,
                                              QueryResults.Fetcher<R> fetcher) {
         QueryList<R> queries = new QueryList<>(query, fetcher);
@@ -1715,7 +1707,7 @@ public class GraphTransaction extends IndexableTransaction {
                 E.checkArgument(keys.containsAll(primaryKeys),
                                 "The primary keys: %s of vertex label '%s' " +
                                 "must be set when using '%s' id strategy",
-                                this.graph().mapPkId2Name(primaryKeys),
+                                //this.graph().mapPkId2Name(primaryKeys),
                                 vertexLabel.name(), strategy);
                 break;
             case AUTOMATIC:
@@ -1776,11 +1768,11 @@ public class GraphTransaction extends IndexableTransaction {
             @SuppressWarnings("unchecked")
             Collection<Id> missed = CollectionUtils.subtract(nonNullKeys, keys);
             HugeGraph graph = this.graph();
-
-            E.checkArgument(false, "All non-null property keys %s of " +
-                                   "vertex label '%s' must be set, missed keys %s",
-                            graph.mapPkId2Name(nonNullKeys), vertexLabel.name(),
-                            graph.mapPkId2Name(missed));
+            //
+            //E.checkArgument(false, "All non-null property keys %s of " +
+            //                       "vertex label '%s' must be set, missed keys %s",
+            //                graph.mapPkId2Name(nonNullKeys), vertexLabel.name(),
+            //                graph.mapPkId2Name(missed));
         }
     }
 

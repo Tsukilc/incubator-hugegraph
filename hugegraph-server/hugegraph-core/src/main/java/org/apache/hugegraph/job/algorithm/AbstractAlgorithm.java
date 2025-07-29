@@ -29,10 +29,10 @@ import java.util.function.Consumer;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.mutable.MutableLong;
-import org.apache.hugegraph.HugeException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.exception.HugeException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.iterator.FilterIterator;
 import org.apache.hugegraph.iterator.FlatMapperIterator;
 import org.apache.hugegraph.job.UserJob;
@@ -110,12 +110,6 @@ public abstract class AbstractAlgorithm implements Algorithm {
 
     public static final String C_LABEL = "c_label";
     public static final String R_RANK = "r_rank";
-
-    @Override
-    public void checkParameters(Map<String, Object> parameters) {
-        E.checkArgument(parameters.isEmpty(),
-                        "Unnecessary parameters: %s", parameters);
-    }
 
     protected static int depth(Map<String, Object> parameters) {
         int depth = ParameterUtil.parameterInt(parameters, KEY_DEPTH);
@@ -272,11 +266,17 @@ public abstract class AbstractAlgorithm implements Algorithm {
         }
     }
 
+    @Override
+    public void checkParameters(Map<String, Object> parameters) {
+        E.checkArgument(parameters.isEmpty(),
+                        "Unnecessary parameters: %s", parameters);
+    }
+
     public static class AlgoTraverser extends HugeTraverser
             implements AutoCloseable {
 
-        private final UserJob<Object> job;
         protected final ExecutorService executor;
+        private final UserJob<Object> job;
         protected long progress;
 
         public AlgoTraverser(UserJob<Object> job) {

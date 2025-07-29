@@ -28,8 +28,8 @@ import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.exception.NotAllowException;
@@ -108,6 +108,23 @@ public class EdgeLabelBuilder extends AbstractBuilder
         this.enableLabelIndex = copy.enableLabelIndex();
         this.userdata = new Userdata(copy.userdata());
         this.checkExist = false;
+    }
+
+    private static Set<String> mapPkId2Name(HugeGraph graph, Set<Id> ids) {
+        return new HashSet<>(graph.mapPkId2Name(ids));
+    }
+
+    private static List<String> mapPkId2Name(HugeGraph graph, List<Id> ids) {
+        return graph.mapPkId2Name(ids);
+    }
+
+    private static String mapElId2Name(HugeGraph graph, Id fatherId) {
+        return graph.mapElId2Name(ImmutableList.of(fatherId)).get(0);
+    }
+
+    private static Set<Pair<String, String>> mapPairId2Name(HugeGraph graph,
+                                                            Set<Pair<Id, Id>> pairs) {
+        return graph.mapPairId2Name(pairs);
     }
 
     @Override
@@ -726,22 +743,5 @@ public class EdgeLabelBuilder extends AbstractBuilder
                 throw new AssertionError(String.format(
                         "Unknown schema action '%s'", action));
         }
-    }
-
-    private static Set<String> mapPkId2Name(HugeGraph graph, Set<Id> ids) {
-        return new HashSet<>(graph.mapPkId2Name(ids));
-    }
-
-    private static List<String> mapPkId2Name(HugeGraph graph, List<Id> ids) {
-        return graph.mapPkId2Name(ids);
-    }
-
-    private static String mapElId2Name(HugeGraph graph, Id fatherId) {
-        return graph.mapElId2Name(ImmutableList.of(fatherId)).get(0);
-    }
-
-    private static Set<Pair<String, String>> mapPairId2Name(HugeGraph graph,
-                                                            Set<Pair<Id, Id>> pairs) {
-        return graph.mapPairId2Name(pairs);
     }
 }

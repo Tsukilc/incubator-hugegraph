@@ -30,20 +30,20 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.page.PageInfo;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
+import org.apache.hugegraph.serializer.BytesBuffer;
 import org.apache.hugegraph.backend.store.BackendTable;
 import org.apache.hugegraph.backend.store.Shard;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.exception.LimitExceedException;
 import org.apache.hugegraph.exception.NoIndexException;
 import org.apache.hugegraph.schema.SchemaManager;
@@ -81,6 +81,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class EdgeCoreTest extends BaseCoreTest {
+
+    private static void assertContains(
+            List<Edge> edges,
+            String label,
+            Vertex outVertex,
+            Vertex inVertex,
+            Object... kvs) {
+        Assert.assertTrue(Utils.contains(edges,
+                                         new FakeObjects.FakeEdge(label, outVertex, inVertex,
+                                                                  kvs)));
+    }
 
     @Before
     public void initSchema() {
@@ -7534,17 +7545,6 @@ public class EdgeCoreTest extends BaseCoreTest {
                                        .toList();
         Assert.assertTrue(vertices.size() <= 1);
         return vertices.size() == 1 ? vertices.get(0) : null;
-    }
-
-    private static void assertContains(
-            List<Edge> edges,
-            String label,
-            Vertex outVertex,
-            Vertex inVertex,
-            Object... kvs) {
-        Assert.assertTrue(Utils.contains(edges,
-                                         new FakeObjects.FakeEdge(label, outVertex, inVertex,
-                                                                  kvs)));
     }
 
     private int traverseInPage(Function<String, GraphTraversal<?, ?>> fetcher) {

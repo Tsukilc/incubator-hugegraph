@@ -28,7 +28,7 @@ import org.apache.hugegraph.HugeFactory;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.auth.StandardAuthenticator;
 import org.apache.hugegraph.backend.store.BackendStoreInfo;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.ServerOptions;
 import org.apache.hugegraph.dist.RegisterUtil;

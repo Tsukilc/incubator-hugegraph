@@ -27,17 +27,17 @@ import java.util.Map;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.page.PageState;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.Condition.RangeConditions;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.Condition.RangeConditions;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry.BinaryId;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry.BackendColumn;
@@ -100,6 +100,73 @@ public class BinarySerializer extends AbstractSerializer {
         this.keyWithIdPrefix = keyWithIdPrefix;
         this.indexWithIdPrefix = indexWithIdPrefix;
         this.enablePartition = enablePartition;
+    }
+
+    private static Query prefixQuery(ConditionQuery query, Id prefix) {
+        Query newQuery;
+        if (query.paging() && !query.page().isEmpty()) {
+            /*
+             * If used paging and the page number is not empty, deserialize
+             * the page to id and use it as the starting row for this query
+             */
+            byte[] position = PageState.fromString(query.page()).position();
+            // FIXME: Due to the inconsistency in the definition of `position` of RocksDB
+            //  scan iterator and Hstore, temporarily remove the following check.
+            // E.checkArgument(Bytes.compare(position, prefix.asBytes()) >= 0,
+            //                "Invalid page out of lower bound");
+            BinaryId start = new BinaryId(position, null);
+            newQuery = new IdPrefixQuery(query, start, prefix);
+        } else {
+            newQuery = new IdPrefixQuery(query, prefix);
+        }
+        return newQuery;
+    }
+
+    protected static BinaryId formatIndexId(HugeType type, Id indexLabel,
+                                            Object fieldValues,
+                                            boolean equal) {
+        boolean withEnding = type.isRangeIndex() || equal;
+        Id id = HugeIndex.formatIndexId(type, indexLabel, fieldValues);
+        if (!type.isNumericIndex() && indexIdLengthExceedLimit(id)) {
+            id = HugeIndex.formatIndexHashId(type, indexLabel, fieldValues);
+        }
+        BytesBuffer buffer = BytesBuffer.allocate(1 + id.length());
+        byte[] idBytes = buffer.writeIndexId(id, type, withEnding).bytes();
+        return new BinaryId(idBytes, id);
+    }
+
+    protected static boolean indexIdLengthExceedLimit(Id id) {
+        return id.asBytes().length > BytesBuffer.INDEX_HASH_ID_THRESHOLD;
+    }
+
+    protected static boolean indexFieldValuesUnmatched(byte[] value,
+                                                       Object fieldValues) {
+        if (value != null && value.length > 0 && fieldValues != null) {
+            return !StringEncoding.decode(value).equals(fieldValues);
+        }
+        return false;
+    }
+
+    public static void increaseOne(byte[] bytes) {
+        final byte BYTE_MAX_VALUE = (byte) 0xff;
+        final byte INCREASE_STEP = 0x01;
+        assert bytes.length > 0;
+        byte last = bytes[bytes.length - 1];
+        if (last != BYTE_MAX_VALUE) {
+            bytes[bytes.length - 1] += INCREASE_STEP;
+        } else {
+            // Process overflow (like [1, 255] => [2, 0])
+            int i = bytes.length - 1;
+            for (; i > 0 && bytes[i] == BYTE_MAX_VALUE; --i) {
+                bytes[i] += INCREASE_STEP;
+            }
+            if (bytes[i] == BYTE_MAX_VALUE) {
+                assert i == 0;
+                throw new BackendException("Unable to increase bytes: %s",
+                                           Bytes.toHex(bytes));
+            }
+            bytes[i] += INCREASE_STEP;
+        }
     }
 
     @Override
@@ -941,73 +1008,6 @@ public class BinarySerializer extends AbstractSerializer {
             parsedEntry.column(buffer.bytes(), col.value);
         }
         return parsedEntry;
-    }
-
-    private static Query prefixQuery(ConditionQuery query, Id prefix) {
-        Query newQuery;
-        if (query.paging() && !query.page().isEmpty()) {
-            /*
-             * If used paging and the page number is not empty, deserialize
-             * the page to id and use it as the starting row for this query
-             */
-            byte[] position = PageState.fromString(query.page()).position();
-            // FIXME: Due to the inconsistency in the definition of `position` of RocksDB
-            //  scan iterator and Hstore, temporarily remove the following check.
-            // E.checkArgument(Bytes.compare(position, prefix.asBytes()) >= 0,
-            //                "Invalid page out of lower bound");
-            BinaryId start = new BinaryId(position, null);
-            newQuery = new IdPrefixQuery(query, start, prefix);
-        } else {
-            newQuery = new IdPrefixQuery(query, prefix);
-        }
-        return newQuery;
-    }
-
-    protected static BinaryId formatIndexId(HugeType type, Id indexLabel,
-                                            Object fieldValues,
-                                            boolean equal) {
-        boolean withEnding = type.isRangeIndex() || equal;
-        Id id = HugeIndex.formatIndexId(type, indexLabel, fieldValues);
-        if (!type.isNumericIndex() && indexIdLengthExceedLimit(id)) {
-            id = HugeIndex.formatIndexHashId(type, indexLabel, fieldValues);
-        }
-        BytesBuffer buffer = BytesBuffer.allocate(1 + id.length());
-        byte[] idBytes = buffer.writeIndexId(id, type, withEnding).bytes();
-        return new BinaryId(idBytes, id);
-    }
-
-    protected static boolean indexIdLengthExceedLimit(Id id) {
-        return id.asBytes().length > BytesBuffer.INDEX_HASH_ID_THRESHOLD;
-    }
-
-    protected static boolean indexFieldValuesUnmatched(byte[] value,
-                                                       Object fieldValues) {
-        if (value != null && value.length > 0 && fieldValues != null) {
-            return !StringEncoding.decode(value).equals(fieldValues);
-        }
-        return false;
-    }
-
-    public static void increaseOne(byte[] bytes) {
-        final byte BYTE_MAX_VALUE = (byte) 0xff;
-        final byte INCREASE_STEP = 0x01;
-        assert bytes.length > 0;
-        byte last = bytes[bytes.length - 1];
-        if (last != BYTE_MAX_VALUE) {
-            bytes[bytes.length - 1] += INCREASE_STEP;
-        } else {
-            // Process overflow (like [1, 255] => [2, 0])
-            int i = bytes.length - 1;
-            for (; i > 0 && bytes[i] == BYTE_MAX_VALUE; --i) {
-                bytes[i] += INCREASE_STEP;
-            }
-            if (bytes[i] == BYTE_MAX_VALUE) {
-                assert i == 0;
-                throw new BackendException("Unable to increase bytes: %s",
-                                           Bytes.toHex(bytes));
-            }
-            bytes[i] += INCREASE_STEP;
-        }
     }
 
     @Override

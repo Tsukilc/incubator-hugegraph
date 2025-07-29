@@ -25,12 +25,12 @@ import java.nio.charset.CodingErrorAction;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.RedirectFilter;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.define.Checkable;
 import org.apache.hugegraph.job.GremlinJob;
@@ -102,6 +102,26 @@ public class GremlinAPI extends API {
         private String language = "gremlin-groovy";
         @JsonProperty
         private Map<String, String> aliases = new HashMap<>();
+
+        public static GremlinRequest fromJson(String json) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = JsonUtil.fromJson(json, Map.class);
+            String gremlin = (String) map.get("gremlin");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bindings = (Map<String, Object>)
+                    map.get("bindings");
+            String language = (String) map.get("language");
+            @SuppressWarnings("unchecked")
+            Map<String, String> aliases = (Map<String, String>)
+                    map.get("aliases");
+
+            GremlinRequest request = new GremlinRequest();
+            request.gremlin(gremlin);
+            request.bindings(bindings);
+            request.language(language);
+            request.aliases(aliases);
+            return request;
+        }
 
         public String gremlin() {
             return this.gremlin;
@@ -182,26 +202,6 @@ public class GremlinAPI extends API {
             map.put("language", this.language);
             map.put("aliases", this.aliases);
             return JsonUtil.toJson(map);
-        }
-
-        public static GremlinRequest fromJson(String json) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> map = JsonUtil.fromJson(json, Map.class);
-            String gremlin = (String) map.get("gremlin");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> bindings = (Map<String, Object>)
-                    map.get("bindings");
-            String language = (String) map.get("language");
-            @SuppressWarnings("unchecked")
-            Map<String, String> aliases = (Map<String, String>)
-                    map.get("aliases");
-
-            GremlinRequest request = new GremlinRequest();
-            request.gremlin(gremlin);
-            request.bindings(bindings);
-            request.language(language);
-            request.aliases(aliases);
-            return request;
         }
     }
 }

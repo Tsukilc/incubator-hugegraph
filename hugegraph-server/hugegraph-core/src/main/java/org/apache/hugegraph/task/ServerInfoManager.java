@@ -17,7 +17,7 @@
 
 package org.apache.hugegraph.task;
 
-import static org.apache.hugegraph.backend.query.Query.NO_LIMIT;
+import static org.apache.hugegraph.query.Query.NO_LIMIT;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -25,13 +25,13 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageInfo;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.exception.ConnectionException;
@@ -54,11 +54,9 @@ import com.google.common.collect.ImmutableMap;
 
 public class ServerInfoManager {
 
-    private static final Logger LOG = Log.logger(ServerInfoManager.class);
-
     public static final long MAX_SERVERS = 100000L;
     public static final long PAGE_SIZE = 10L;
-
+    private static final Logger LOG = Log.logger(ServerInfoManager.class);
     private final HugeGraphParams graph;
     private final ExecutorService dbExecutor;
 
@@ -115,7 +113,7 @@ public class ServerInfoManager {
             try {
                 Thread.sleep(existed.expireTime() - now + 1);
             } catch (InterruptedException e) {
-               throw new HugeException("Interrupted when waiting for server info expired", e);
+                throw new HugeException("Interrupted when waiting for server info expired", e);
             }
         }
         E.checkArgument(existed == null || !existed.alive(),

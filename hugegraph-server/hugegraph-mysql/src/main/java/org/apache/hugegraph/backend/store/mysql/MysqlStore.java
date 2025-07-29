@@ -25,9 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.AbstractBackendStore;
 import org.apache.hugegraph.backend.store.BackendAction;
 import org.apache.hugegraph.backend.store.BackendEntry;
@@ -70,6 +70,14 @@ public abstract class MysqlStore extends AbstractBackendStore<Session> {
 
         this.registerMetaHandlers();
         LOG.debug("Store loaded: {}", store);
+    }
+
+    protected static MysqlBackendEntry castBackendEntry(BackendEntry entry) {
+        if (!(entry instanceof MysqlBackendEntry)) {
+            throw new BackendException(
+                    "MySQL store only supports MysqlBackendEntry");
+        }
+        return (MysqlBackendEntry) entry;
     }
 
     private void registerMetaHandlers() {
@@ -364,14 +372,6 @@ public abstract class MysqlStore extends AbstractBackendStore<Session> {
     protected final void checkClusterConnected() {
         E.checkState(this.sessions != null,
                      "MySQL store has not been initialized");
-    }
-
-    protected static MysqlBackendEntry castBackendEntry(BackendEntry entry) {
-        if (!(entry instanceof MysqlBackendEntry)) {
-            throw new BackendException(
-                    "MySQL store only supports MysqlBackendEntry");
-        }
-        return (MysqlBackendEntry) entry;
     }
 
     public static class MysqlSchemaStore extends MysqlStore {

@@ -22,8 +22,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.concurrent.LockManager;
 import org.apache.hugegraph.testutil.Assert;
 import org.apache.hugegraph.testutil.Whitebox;
@@ -38,8 +38,8 @@ import com.google.common.collect.ImmutableSet;
 
 public class LocksTableTest extends BaseUnitTest {
 
-    private LockUtil.LocksTable locksTable;
     private static String GRAPH = "graph";
+    private LockUtil.LocksTable locksTable;
 
     @BeforeClass
     public static void setup() {
@@ -47,15 +47,27 @@ public class LocksTableTest extends BaseUnitTest {
         genLockGroup(GRAPH, "group1");
     }
 
-    @Before
-    public void initLockTable() {
-        this.locksTable = new LockUtil.LocksTable(GRAPH);
-    }
-
     @AfterClass
     public static void teardown() {
         destroyLockGroup(GRAPH, "group");
         destroyLockGroup(GRAPH, "group1");
+    }
+
+    protected static void genLockGroup(String graph, String group) {
+        LockManager.instance().create(groupName(graph, group));
+    }
+
+    protected static void destroyLockGroup(String graph, String group) {
+        LockManager.instance().destroy(groupName(graph, group));
+    }
+
+    protected static String groupName(String graph, String group) {
+        return String.join("_", graph, group);
+    }
+
+    @Before
+    public void initLockTable() {
+        this.locksTable = new LockUtil.LocksTable(GRAPH);
     }
 
     @Test
@@ -291,17 +303,5 @@ public class LocksTableTest extends BaseUnitTest {
             Assert.assertEquals(0, table.size());
             Assert.assertEquals(0, lockList.size());
         });
-    }
-
-    protected static void genLockGroup(String graph, String group) {
-        LockManager.instance().create(groupName(graph, group));
-    }
-
-    protected static void destroyLockGroup(String graph, String group) {
-        LockManager.instance().destroy(groupName(graph, group));
-    }
-
-    protected static String groupName(String graph, String group) {
-        return String.join("_", graph, group);
     }
 }

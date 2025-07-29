@@ -28,7 +28,7 @@ import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.StatusFilter.Status;
 import org.apache.hugegraph.auth.AuthManager;
 import org.apache.hugegraph.auth.HugeProject;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.define.Checkable;
 import org.apache.hugegraph.exception.NotFoundException;
@@ -62,6 +62,14 @@ public class ProjectAPI extends API {
     private static final Logger LOG = Log.logger(ProjectAPI.class);
     private static final String ACTION_ADD_GRAPH = "add_graph";
     private static final String ACTION_REMOVE_GRAPH = "remove_graph";
+
+    public static boolean isAddGraph(String action) {
+        return ACTION_ADD_GRAPH.equals(action);
+    }
+
+    public static boolean isRemoveGraph(String action) {
+        return ACTION_REMOVE_GRAPH.equals(action);
+    }
 
     @POST
     @Timed
@@ -174,14 +182,6 @@ public class ProjectAPI extends API {
         } catch (NotFoundException e) {
             throw new IllegalArgumentException("Invalid project id: " + id);
         }
-    }
-
-    public static boolean isAddGraph(String action) {
-        return ACTION_ADD_GRAPH.equals(action);
-    }
-
-    public static boolean isRemoveGraph(String action) {
-        return ACTION_REMOVE_GRAPH.equals(action);
     }
 
     @JsonIgnoreProperties(value = {"id", "target_creator",

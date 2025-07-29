@@ -29,13 +29,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hugegraph.HugeException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.IdGenerator.LongId;
-import org.apache.hugegraph.backend.id.IdGenerator.StringId;
-import org.apache.hugegraph.backend.id.IdGenerator.UuidId;
+import org.apache.hugegraph.exception.HugeException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.IdGenerator.LongId;
+import org.apache.hugegraph.id.IdGenerator.StringId;
+import org.apache.hugegraph.id.IdGenerator.UuidId;
 import org.apache.hugegraph.backend.store.Shard;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.IndexLabel;
@@ -75,18 +75,14 @@ public class HugeGraphSONModule extends TinkerPopJacksonModule {
     private static final long serialVersionUID = 6480426922914059122L;
 
     private static final String TYPE_NAMESPACE = "hugegraph";
-
-    private static boolean OPTIMIZE_SERIALIZE = true;
-
     @SuppressWarnings("rawtypes")
     private static final Map<Class, String> TYPE_DEFINITIONS;
-
     private static final GraphSONSchemaSerializer SCHEMA_SERIALIZER =
             new GraphSONSchemaSerializer();
-
     // NOTE: jackson will synchronize DateFormat
     private static final String DF = "yyyy-MM-dd HH:mm:ss.SSS";
-    private static final DateFormat DATE_FORMAT = new SimpleDateFormat(DF);
+    public static final DateFormat DATE_FORMAT = new SimpleDateFormat(DF);
+    private static final boolean OPTIMIZE_SERIALIZE = true;
 
     static {
         TYPE_DEFINITIONS = new ConcurrentHashMap<>();
@@ -114,10 +110,6 @@ public class HugeGraphSONModule extends TinkerPopJacksonModule {
         TYPE_DEFINITIONS.put(Shard.class, "Shard");
     }
 
-    public static void register(HugeGraphIoRegistry io) {
-        io.register(GraphSONIo.class, null, new HugeGraphSONModule());
-    }
-
     private HugeGraphSONModule() {
         super(TYPE_NAMESPACE);
 
@@ -135,15 +127,8 @@ public class HugeGraphSONModule extends TinkerPopJacksonModule {
         }
     }
 
-    @SuppressWarnings("rawtypes")
-    @Override
-    public Map<Class, String> getTypeDefinitions() {
-        return TYPE_DEFINITIONS;
-    }
-
-    @Override
-    public String getTypeNamespace() {
-        return TYPE_NAMESPACE;
+    public static void register(HugeGraphIoRegistry io) {
+        io.register(GraphSONIo.class, null, new HugeGraphSONModule());
     }
 
     public static void registerCommonSerializers(SimpleModule module) {
@@ -206,6 +191,28 @@ public class HugeGraphSONModule extends TinkerPopJacksonModule {
 
         module.addSerializer(Path.class, new PathSerializer());
         module.addSerializer(Tree.class, new TreeSerializer());
+    }
+
+    private static void writeEntry(JsonGenerator jsonGenerator,
+                                   Map<HugeKeys, Object> schema)
+            throws IOException {
+        jsonGenerator.writeStartObject();
+        for (Map.Entry<HugeKeys, Object> entry : schema.entrySet()) {
+            jsonGenerator.writeFieldName(entry.getKey().string());
+            jsonGenerator.writeObject(entry.getValue());
+        }
+        jsonGenerator.writeEndObject();
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Override
+    public Map<Class, String> getTypeDefinitions() {
+        return TYPE_DEFINITIONS;
+    }
+
+    @Override
+    public String getTypeNamespace() {
+        return TYPE_NAMESPACE;
     }
 
     @SuppressWarnings("rawtypes")
@@ -351,17 +358,6 @@ public class HugeGraphSONModule extends TinkerPopJacksonModule {
                 throws IOException {
             writeEntry(jsonGenerator, SCHEMA_SERIALIZER.writeIndexLabel(il));
         }
-    }
-
-    private static void writeEntry(JsonGenerator jsonGenerator,
-                                   Map<HugeKeys, Object> schema)
-            throws IOException {
-        jsonGenerator.writeStartObject();
-        for (Map.Entry<HugeKeys, Object> entry : schema.entrySet()) {
-            jsonGenerator.writeFieldName(entry.getKey().string());
-            jsonGenerator.writeObject(entry.getValue());
-        }
-        jsonGenerator.writeEndObject();
     }
 
     protected abstract static class HugeElementSerializer<T extends HugeElement>

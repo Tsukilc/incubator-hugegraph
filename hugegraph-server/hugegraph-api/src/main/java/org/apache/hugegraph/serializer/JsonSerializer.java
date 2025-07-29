@@ -24,10 +24,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.auth.SchemaDefine.AuthElement;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageInfo;
 import org.apache.hugegraph.iterator.Metadatable;
 import org.apache.hugegraph.schema.EdgeLabel;

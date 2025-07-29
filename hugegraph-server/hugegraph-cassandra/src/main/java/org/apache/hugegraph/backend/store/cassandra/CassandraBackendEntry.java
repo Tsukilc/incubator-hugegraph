@@ -17,7 +17,7 @@
 
 package org.apache.hugegraph.backend.store.cassandra;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.serializer.TableBackendEntry;
 import org.apache.hugegraph.type.HugeType;
 

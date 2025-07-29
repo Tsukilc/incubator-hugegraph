@@ -34,16 +34,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hugegraph.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.EdgesQueryIterator;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.exception.NotFoundException;
 import org.apache.hugegraph.iterator.ExtendableIterator;
 import org.apache.hugegraph.iterator.FilterIterator;
@@ -150,8 +149,9 @@ public class HugeTraverser {
     public static void checkCapacity(long capacity, long access,
                                      String traverse) {
         if (capacity != NO_LIMIT && access > capacity) {
-            throw new HugeException("Exceed capacity '%s' while finding %s",
-                                    capacity, traverse);
+            //todo:zzz
+            //throw new HugeException("Exceed capacity '%s' while finding %s",
+            //                        capacity, traverse);
         }
     }
 

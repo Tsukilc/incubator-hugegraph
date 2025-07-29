@@ -25,8 +25,8 @@ import org.apache.hugegraph.backend.cache.Cache;
 import org.apache.hugegraph.backend.cache.CacheManager;
 import org.apache.hugegraph.backend.cache.OffheapCache;
 import org.apache.hugegraph.backend.cache.RamCache;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.testutil.Assert;
 import org.apache.hugegraph.testutil.Whitebox;
 import org.apache.hugegraph.unit.BaseUnitTest;
@@ -41,6 +41,16 @@ public class CacheManagerTest extends BaseUnitTest {
 
     private Map<String, Cache<Id, Object>> originCaches;
     private Map<String, Cache<Id, Object>> mockCaches;
+
+    @SuppressWarnings({"unused", "unchecked"})
+    private static Cache<Id, Object> newCacheProxy(Cache<Id, Object> cache) {
+        Object p = Proxy.newProxyInstance(Cache.class.getClassLoader(),
+                                          new Class[]{Cache.class},
+                                          (proxy, method, args) -> {
+                                              return method.invoke(cache, args);
+                                          });
+        return (Cache<Id, Object>) p;
+    }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Before
@@ -296,16 +306,6 @@ public class CacheManagerTest extends BaseUnitTest {
 
         Assert.assertEquals(0, cache1.size());
         Assert.assertEquals(1, cache2.size());
-    }
-
-    @SuppressWarnings({"unused", "unchecked"})
-    private static Cache<Id, Object> newCacheProxy(Cache<Id, Object> cache) {
-        Object p = Proxy.newProxyInstance(Cache.class.getClassLoader(),
-                                          new Class[]{Cache.class},
-                                          (proxy, method, args) -> {
-                                              return method.invoke(cache, args);
-                                          });
-        return (Cache<Id, Object>) p;
     }
 }
 

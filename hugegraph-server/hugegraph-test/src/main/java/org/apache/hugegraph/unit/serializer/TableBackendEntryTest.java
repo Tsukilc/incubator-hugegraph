@@ -18,8 +18,8 @@
 package org.apache.hugegraph.unit.serializer;
 
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.serializer.TableBackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry.BackendColumn;
 import org.apache.hugegraph.testutil.Assert;

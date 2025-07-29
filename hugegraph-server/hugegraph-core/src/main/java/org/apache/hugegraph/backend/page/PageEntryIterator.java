@@ -19,7 +19,7 @@ package org.apache.hugegraph.backend.page;
 
 import java.util.NoSuchElementException;
 
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.exception.NotSupportException;
 import org.apache.hugegraph.iterator.CIter;

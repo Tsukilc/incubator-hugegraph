@@ -21,7 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.UUID;
 
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.tinkerpop.shaded.kryo.Kryo;
 import org.apache.tinkerpop.shaded.kryo.Serializer;
 import org.apache.tinkerpop.shaded.kryo.io.Input;

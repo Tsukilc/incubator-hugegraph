@@ -35,8 +35,8 @@ import org.apache.hugegraph.auth.HugePermission;
 import org.apache.hugegraph.auth.HugeRole;
 import org.apache.hugegraph.auth.HugeTarget;
 import org.apache.hugegraph.auth.HugeUser;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.meta.lock.LockResult;
 import org.apache.hugegraph.meta.managers.AuthMetaManager;
 import org.apache.hugegraph.meta.managers.ConfigMetaManager;
@@ -67,6 +67,8 @@ public class MetaManager {
     public static final String META_PATH_HUGEGRAPH = "HUGEGRAPH";
     public static final String META_PATH_GRAPHSPACE = "GRAPHSPACE";
     public static final String META_PATH_GRAPHSPACE_LIST = "GRAPHSPACE_LIST";
+    public static final String META_PATH_SYS_GRAPH_CONF = "SYS_GRAPH_CONF";
+    public static final String META_PATH_DEFAULT_GS = "DEFAULT";
     public static final String META_PATH_SERVICE = "SERVICE";
     public static final String META_PATH_SERVICE_CONF = "SERVICE_CONF";
     public static final String META_PATH_GRAPH_CONF = "GRAPH_CONF";
@@ -410,6 +412,18 @@ public class MetaManager {
         this.graphMetaManager.updateGraphConfig(graphSpace, graph, configs);
     }
 
+    public void addSysGraphConfig(Map<String, Object> configs) {
+        this.graphMetaManager.addSysGraphConfig(configs);
+    }
+
+    public Map<String, Object> getSysGraphConfig() {
+        return this.graphMetaManager.getSysGraphConfig();
+    }
+
+    public void removeSysGraphConfig() {
+        this.graphMetaManager.removeSysGraphConfig();
+    }
+
     public GraphSpace graphSpace(String name) {
         return this.spaceMetaManager.graphSpace(name);
     }
@@ -508,6 +522,22 @@ public class MetaManager {
      */
     public void notifyGraphEdgeCacheClear(String graphSpace, String graph) {
         this.graphMetaManager.notifyGraphEdgeCacheClear(graphSpace, graph);
+    }
+
+    public LockResult lock(String... keys) {
+        return this.lockMetaManager.lock(keys);
+    }
+
+    public LockResult lock(long ttl, String... keys) {
+        return this.lockMetaManager.lock(ttl, keys);
+    }
+
+    public LockResult lock(String key, long ttl) {
+        return this.lockMetaManager.lock(key, ttl);
+    }
+
+    public LockResult lock(String key) {
+        return this.lockMetaManager.lock(key);
     }
 
     public LockResult tryLock(String key) {
@@ -749,7 +779,6 @@ public class MetaManager {
                                 EdgeLabel edgeLabel) {
         this.schemaMetaManager.updateEdgeLabel(graphSpace, graph, edgeLabel);
     }
-
 
     public EdgeLabel getEdgeLabel(String graphSpace, String graph,
                                   Id edgeLabel) {
@@ -1248,6 +1277,7 @@ public class MetaManager {
     }
 
     public static class AuthEvent {
+
         private String op; // ALLOW: CREATE | DELETE | UPDATE
         private String type; // ALLOW: USER | GROUP | TARGET | ACCESS | BELONG
         private String id;

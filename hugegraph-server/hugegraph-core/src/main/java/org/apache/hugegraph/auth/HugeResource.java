@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.auth.SchemaDefine.AuthElement;
 import org.apache.hugegraph.structure.HugeElement;
 import org.apache.hugegraph.traversal.optimize.TraversalUtil;

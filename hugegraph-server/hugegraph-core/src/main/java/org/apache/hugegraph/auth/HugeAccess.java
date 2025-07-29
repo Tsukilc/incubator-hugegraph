@@ -24,7 +24,7 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.auth.SchemaDefine.Relationship;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.type.define.DataType;
 import org.apache.hugegraph.util.E;
@@ -50,6 +50,21 @@ public class HugeAccess extends Relationship {
         this.target = target;
         this.permission = permission;
         this.description = null;
+    }
+
+    public static HugeAccess fromEdge(Edge edge) {
+        HugeAccess access = new HugeAccess((Id) edge.outVertex().id(),
+                                           (Id) edge.inVertex().id());
+        return fromEdge(edge, access);
+    }
+
+    public static Schema schema(HugeGraphParams graph) {
+        return new Schema(graph);
+    }
+
+    public static HugeAccess fromMap(Map<String, Object> map) {
+        HugeAccess access = new HugeAccess(null, null, null);
+        return fromMap(map, access);
     }
 
     @Override
@@ -162,16 +177,6 @@ public class HugeAccess extends Relationship {
         return super.asMap(map);
     }
 
-    public static HugeAccess fromEdge(Edge edge) {
-        HugeAccess access = new HugeAccess((Id) edge.outVertex().id(),
-                                           (Id) edge.inVertex().id());
-        return fromEdge(edge, access);
-    }
-
-    public static Schema schema(HugeGraphParams graph) {
-        return new Schema(graph);
-    }
-
     public static final class P {
 
         public static final String ACCESS = Hidden.hide("access");
@@ -227,10 +232,5 @@ public class HugeAccess extends Relationship {
 
             return super.initProperties(props);
         }
-    }
-
-    public static HugeAccess fromMap(Map<String, Object> map) {
-        HugeAccess access = new HugeAccess(null, null, null);
-        return fromMap(map, access);
     }
 }

@@ -24,7 +24,7 @@ import java.util.Objects;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.ServerOptions;
 import org.apache.hugegraph.util.E;

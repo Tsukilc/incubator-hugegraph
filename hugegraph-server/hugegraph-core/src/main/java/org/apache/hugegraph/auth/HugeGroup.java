@@ -24,7 +24,7 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.auth.SchemaDefine.Entity;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.util.E;
 import org.apache.tinkerpop.gremlin.structure.Graph.Hidden;
@@ -51,6 +51,20 @@ public class HugeGroup extends Entity {
         this.id = id;
         this.name = name;
         this.description = null;
+    }
+
+    public static HugeGroup fromVertex(Vertex vertex) {
+        HugeGroup group = new HugeGroup((Id) vertex.id());
+        return fromVertex(vertex, group);
+    }
+
+    public static Schema schema(HugeGraphParams graph) {
+        return new Schema(graph);
+    }
+
+    public static HugeGroup fromMap(Map<String, Object> map) {
+        HugeGroup group = new HugeGroup("");
+        return fromMap(map, group);
     }
 
     @Override
@@ -141,15 +155,6 @@ public class HugeGroup extends Entity {
         return super.asMap(map);
     }
 
-    public static HugeGroup fromVertex(Vertex vertex) {
-        HugeGroup group = new HugeGroup((Id) vertex.id());
-        return fromVertex(vertex, group);
-    }
-
-    public static Schema schema(HugeGraphParams graph) {
-        return new Schema(graph);
-    }
-
     public static final class P {
 
         public static final String GROUP = Hidden.hide("group");
@@ -202,10 +207,5 @@ public class HugeGroup extends Entity {
 
             return super.initProperties(props);
         }
-    }
-
-    public static HugeGroup fromMap(Map<String, Object> map) {
-        HugeGroup group = new HugeGroup("");
-        return fromMap(map, group);
     }
 }

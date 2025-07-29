@@ -24,7 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntryIterator;
 import org.apache.hugegraph.type.HugeType;
@@ -35,8 +35,8 @@ public class BinaryBackendEntry implements BackendEntry {
 
     private final HugeType type;
     private final BinaryId id;
-    private Id subId;
     private final List<BackendColumn> columns;
+    private Id subId;
     private long ttl;
     private boolean olap;
 

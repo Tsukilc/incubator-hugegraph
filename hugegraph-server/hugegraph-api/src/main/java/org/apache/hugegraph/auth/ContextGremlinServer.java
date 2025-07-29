@@ -21,11 +21,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.auth.HugeGraphAuthProxy.Context;
 import org.apache.hugegraph.auth.HugeGraphAuthProxy.ContextThreadPoolExecutor;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.testutil.Whitebox;
 import org.apache.hugegraph.util.Events;

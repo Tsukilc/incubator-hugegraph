@@ -29,16 +29,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageInfo;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.store.BackendStore;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.exception.ConnectionException;
 import org.apache.hugegraph.exception.NotFoundException;
 import org.apache.hugegraph.iterator.ExtendableIterator;
@@ -89,6 +89,16 @@ public class StandardTaskScheduler implements TaskScheduler {
         this.tasks = new ConcurrentHashMap<>();
 
         this.taskTx = null;
+    }
+
+    private static boolean sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+            return true;
+        } catch (InterruptedException ignored) {
+            // Ignore InterruptedException
+            return false;
+        }
     }
 
     @Override
@@ -156,8 +166,7 @@ public class StandardTaskScheduler implements TaskScheduler {
         }
         try {
             this.graph.graphTransaction().commit();
-        }
-        finally {
+        } finally {
             this.graph.closeTx();
         }
     }
@@ -523,7 +532,7 @@ public class StandardTaskScheduler implements TaskScheduler {
     }
 
     public <V> HugeTask<V> findTask(Id id) {
-        HugeTask<V> result =  this.call(() -> {
+        HugeTask<V> result = this.call(() -> {
             Iterator<Vertex> vertices = this.tx().queryTaskInfos(id);
             Vertex vertex = QueryResults.one(vertices);
             if (vertex == null) {
@@ -733,15 +742,5 @@ public class StandardTaskScheduler implements TaskScheduler {
 
     private boolean supportsPaging() {
         return this.graph.backendStoreFeatures().supportsQueryByPage();
-    }
-
-    private static boolean sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-            return true;
-        } catch (InterruptedException ignored) {
-            // Ignore InterruptedException
-            return false;
-        }
     }
 }

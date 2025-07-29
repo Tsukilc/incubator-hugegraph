@@ -38,15 +38,15 @@ import com.google.common.collect.Lists;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.ConditionQueryFlatten;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
-import org.apache.hugegraph.backend.query.IdQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.IdQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
+import org.apache.hugegraph.serializer.BytesBuffer;
 import org.apache.hugegraph.backend.serializer.MergeIterator;
 import org.apache.hugegraph.backend.store.AbstractBackendStore;
 import org.apache.hugegraph.backend.store.BackendAction;
@@ -56,7 +56,7 @@ import org.apache.hugegraph.backend.store.BackendMutation;
 import org.apache.hugegraph.backend.store.BackendStoreProvider;
 import org.apache.hugegraph.backend.store.BackendTable;
 import org.apache.hugegraph.backend.store.hstore.HstoreSessions.Session;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.iterator.CIter;
 import org.apache.hugegraph.schema.EdgeLabel;
@@ -357,8 +357,9 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
         }
 
         class QueryWrapper implements Iterator<IdPrefixQuery> {
-            Query first;
+
             final Iterator<Query> queries;
+            Query first;
             Iterator<Id> subEls;
             Query preQuery;
             Iterator<IdPrefixQuery> queryListIterator;
@@ -402,7 +403,7 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
                 List<IdPrefixQuery> queryList = Lists.newArrayList();
                 if (hugeGraph != null) {
                     for (ConditionQuery conditionQuery :
-                        ConditionQueryFlatten.flatten(cq)) {
+                            ConditionQueryFlatten.flatten(cq)) {
                         Id label = conditionQuery.condition(HugeKeys.LABEL);
                         /* Parent type + sortKeys: g.V("V.id").outE("parentLabel")
                            .has("sortKey","value") converted to all subtypes + sortKeys */
@@ -418,9 +419,9 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
                             matchEdgeSortKeys(conditionQuery, false,
                                               hugeGraph)) {
                             this.subEls =
-                                getSubLabelsOfParentEl(
-                                    hugeGraph.edgeLabels(),
-                                    label);
+                                    getSubLabelsOfParentEl(
+                                            hugeGraph.edgeLabels(),
+                                            label);
                         }
 
                         if (this.subEls != null &&
@@ -433,8 +434,8 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
                         if (hugeType != null && hugeType.isEdge() &&
                             !conditionQuery.conditions().isEmpty()) {
                             IdPrefixQuery idPrefixQuery =
-                                (IdPrefixQuery) queryWriter.apply(
-                                    conditionQuery);
+                                    (IdPrefixQuery) queryWriter.apply(
+                                            conditionQuery);
                             idPrefixQuery.setOriginQuery(originQuery);
                             queryList.add(idPrefixQuery);
                         }
@@ -449,10 +450,10 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
                 Id ownerId = cq.condition(HugeKeys.OWNER_VERTEX);
                 assert ownerId != null;
                 BytesBuffer buffer =
-                    BytesBuffer.allocate(BytesBuffer.BUF_EDGE_ID);
+                        BytesBuffer.allocate(BytesBuffer.BUF_EDGE_ID);
                 buffer.writeId(ownerId);
                 return new IdPrefixQuery(cq, new BinaryBackendEntry.BinaryId(
-                    buffer.bytes(), ownerId));
+                        buffer.bytes(), ownerId));
             }
 
             private boolean matchEdgeSortKeys(ConditionQuery query,
@@ -584,7 +585,8 @@ public abstract class HstoreStore extends AbstractBackendStore<Session> {
 
     /**
      * Reconstruct the query OLAP table query
-     * Due to the olap merged into one table, when writing olap data, the key has a pk added at the end.
+     * Due to the olap merged into one table, when writing olap data, the key has a pk added at
+     * the end.
      * So when making inquiries here, it is necessary to reconstruct the pk prefix.
      * Write reference BinarySerializer.writeOlapVertex
      *

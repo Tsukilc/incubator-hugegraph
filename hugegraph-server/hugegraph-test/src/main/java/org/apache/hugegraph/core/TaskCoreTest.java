@@ -22,11 +22,11 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.job.GremlinAPI.GremlinRequest;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.exception.NotFoundException;
 import org.apache.hugegraph.job.EphemeralJob;
 import org.apache.hugegraph.job.EphemeralJobBuilder;
@@ -45,6 +45,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 public class TaskCoreTest extends BaseCoreTest {
+
+    private static void sleepAWhile() {
+        sleepAWhile(100);
+    }
+
+    private static void sleepAWhile(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            // ignore
+        }
+    }
 
     @Before
     @Override
@@ -683,18 +695,6 @@ public class TaskCoreTest extends BaseCoreTest {
                .job(new GremlinJob());
 
         return builder.schedule();
-    }
-
-    private static void sleepAWhile() {
-        sleepAWhile(100);
-    }
-
-    private static void sleepAWhile(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            // ignore
-        }
     }
 
     public static class SleepCallable<V> extends TaskCallable<V> {

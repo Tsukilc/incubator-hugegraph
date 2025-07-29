@@ -23,11 +23,16 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.traversal.algorithm.HugeTraverser;
 import org.apache.hugegraph.traversal.algorithm.steps.EdgeStep;
 
 public interface TraverseStrategy {
+
+    static TraverseStrategy create(boolean concurrent, HugeGraph graph) {
+        return concurrent ? new ConcurrentTraverseStrategy(graph) :
+               new SingleTraverseStrategy(graph);
+    }
 
     void traverseOneLayer(Map<Id, List<HugeTraverser.Node>> vertices,
                           EdgeStep step, BiConsumer<Id, EdgeStep> consumer);
@@ -41,9 +46,4 @@ public interface TraverseStrategy {
 
     void addNewVerticesToAll(Map<Id, List<HugeTraverser.Node>> newVertices,
                              Map<Id, List<HugeTraverser.Node>> targets);
-
-    static TraverseStrategy create(boolean concurrent, HugeGraph graph) {
-        return concurrent ? new ConcurrentTraverseStrategy(graph) :
-               new SingleTraverseStrategy(graph);
-    }
 }

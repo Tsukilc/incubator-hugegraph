@@ -30,11 +30,11 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.backend.cache.Cache;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendAction;
 import org.apache.hugegraph.backend.store.BackendMutation;
 import org.apache.hugegraph.backend.store.BackendStore;
@@ -47,7 +47,7 @@ import org.apache.hugegraph.backend.store.raft.rpc.RemovePeerProcessor;
 import org.apache.hugegraph.backend.store.raft.rpc.RpcForwarder;
 import org.apache.hugegraph.backend.store.raft.rpc.SetLeaderProcessor;
 import org.apache.hugegraph.backend.store.raft.rpc.StoreCommandProcessor;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.type.HugeType;
@@ -72,8 +72,6 @@ import com.alipay.sofa.jraft.util.ThreadPoolUtil;
 
 public final class RaftContext {
 
-    private static final Logger LOG = Log.logger(RaftContext.class);
-
     // unit is ms
     public static final int NO_TIMEOUT = -1;
     public static final int POLL_INTERVAL = 5000;
@@ -83,14 +81,12 @@ public final class RaftContext {
     public static final int BUSY_MAX_SLEEP_FACTOR = 5 * 1000;
     public static final int WAIT_RPC_TIMEOUT = 30 * 60 * 1000;
     public static final int LOG_WARN_INTERVAL = 60 * 1000;
-
     // compress block size
     public static final int BLOCK_SIZE = (int) (Bytes.KB * 8);
-
     // work queue size
     public static final int QUEUE_SIZE = CoreOptions.CPUS;
     public static final long KEEP_ALIVE_SECOND = 300L;
-
+    private static final Logger LOG = Log.logger(RaftContext.class);
     private final HugeGraphParams params;
 
     private final Configuration groupPeers;
@@ -149,6 +145,22 @@ public final class RaftContext {
         this.raftNode = null;
         this.raftGroupManager = null;
         this.rpcForwarder = null;
+    }
+
+    private static ExecutorService newPool(int coreThreads, int maxThreads,
+                                           String name,
+                                           RejectedExecutionHandler handler) {
+        BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
+        return ThreadPoolUtil.newBuilder()
+                             .poolName(name)
+                             .enableMetric(false)
+                             .coreThreads(coreThreads)
+                             .maximumThreads(maxThreads)
+                             .keepAliveSeconds(KEEP_ALIVE_SECOND)
+                             .workQueue(queue)
+                             .threadFactory(new NamedThreadFactory(name, true))
+                             .rejectedHandler(handler)
+                             .build();
     }
 
     public void initRaftNode(com.alipay.remoting.rpc.RpcServer rpcServer) {
@@ -441,21 +453,5 @@ public final class RaftContext {
         RejectedExecutionHandler handler =
                 new ThreadPoolExecutor.CallerRunsPolicy();
         return newPool(threads, threads, name, handler);
-    }
-
-    private static ExecutorService newPool(int coreThreads, int maxThreads,
-                                           String name,
-                                           RejectedExecutionHandler handler) {
-        BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
-        return ThreadPoolUtil.newBuilder()
-                             .poolName(name)
-                             .enableMetric(false)
-                             .coreThreads(coreThreads)
-                             .maximumThreads(maxThreads)
-                             .keepAliveSeconds(KEEP_ALIVE_SECOND)
-                             .workQueue(queue)
-                             .threadFactory(new NamedThreadFactory(name, true))
-                             .rejectedHandler(handler)
-                             .build();
     }
 }

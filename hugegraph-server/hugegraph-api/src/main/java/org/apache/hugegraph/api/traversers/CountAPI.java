@@ -27,7 +27,7 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.API;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.structure.HugeVertex;
 import org.apache.hugegraph.traversal.algorithm.CountTraverser;
@@ -57,6 +57,15 @@ public class CountAPI extends API {
 
     private static final Logger LOG = Log.logger(CountAPI.class);
 
+    private static List<EdgeStep> steps(HugeGraph graph, CountRequest request) {
+        int stepSize = request.steps.size();
+        List<EdgeStep> steps = new ArrayList<>(stepSize);
+        for (Step step : request.steps) {
+            steps.add(step.jsonToStep(graph));
+        }
+        return steps;
+    }
+
     @POST
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
@@ -85,15 +94,6 @@ public class CountAPI extends API {
                                      request.dedupSize);
 
         return manager.serializer(g).writeMap(ImmutableMap.of("count", count));
-    }
-
-    private static List<EdgeStep> steps(HugeGraph graph, CountRequest request) {
-        int stepSize = request.steps.size();
-        List<EdgeStep> steps = new ArrayList<>(stepSize);
-        for (Step step : request.steps) {
-            steps.add(step.jsonToStep(graph));
-        }
-        return steps;
     }
 
     private static class CountRequest {

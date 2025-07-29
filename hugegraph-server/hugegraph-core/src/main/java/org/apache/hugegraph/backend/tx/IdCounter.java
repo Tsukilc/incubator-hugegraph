@@ -21,9 +21,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.pd.client.PDClient;
 import org.apache.hugegraph.pd.grpc.Pdpb;
 import org.apache.hugegraph.store.term.HgPair;
@@ -36,7 +36,7 @@ public class IdCounter {
     private static final int DELTA = 10000;
     private static final String DELIMITER = "/";
     private static final Map<String, HgPair<AtomicLong, AtomicLong>> ids =
-        new ConcurrentHashMap<>();
+            new ConcurrentHashMap<>();
     private final PDClient pdClient;
     private final String graphName;
 

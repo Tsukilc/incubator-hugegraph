@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.TableDefine;
 import org.apache.hugegraph.backend.store.mysql.MysqlBackendEntry;
 import org.apache.hugegraph.backend.store.mysql.MysqlSessions;

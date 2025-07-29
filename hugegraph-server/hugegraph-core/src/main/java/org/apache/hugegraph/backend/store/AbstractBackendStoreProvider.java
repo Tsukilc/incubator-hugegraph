@@ -21,9 +21,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.raft.StoreSnapshotFile;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.event.EventListener;
@@ -38,14 +38,11 @@ public abstract class AbstractBackendStoreProvider
         implements BackendStoreProvider {
 
     private static final Logger LOG = Log.logger(AbstractBackendStoreProvider.class);
-
+    private final EventHub storeEventHub = new EventHub("store");
+    protected Map<String, BackendStore> stores = null;
     private String graph = null;
 
-    private final EventHub storeEventHub = new EventHub("store");
-
-    protected Map<String, BackendStore> stores = null;
-
-    protected final void notifyAndWaitEvent(String event) {
+    public final void notifyAndWaitEvent(String event) {
         Future<?> future = this.storeEventHub.notify(event, this);
         try {
             future.get();

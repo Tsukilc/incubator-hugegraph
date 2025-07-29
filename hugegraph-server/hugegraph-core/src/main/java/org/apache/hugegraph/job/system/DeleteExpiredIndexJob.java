@@ -21,7 +21,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.query.IdQuery;
+import org.apache.hugegraph.query.IdQuery;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.structure.HugeElement;
 import org.apache.hugegraph.structure.HugeIndex;

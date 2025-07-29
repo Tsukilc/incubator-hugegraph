@@ -17,7 +17,7 @@
 
 package org.apache.hugegraph.backend.store.raft.compress;
 
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 
 public class CompressStrategyManager {

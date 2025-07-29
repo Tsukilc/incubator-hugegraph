@@ -19,6 +19,7 @@ package org.apache.hugegraph;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -27,11 +28,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hugegraph.analyzer.Analyzer;
 import org.apache.hugegraph.analyzer.AnalyzerFactory;
 import org.apache.hugegraph.auth.AuthManager;
 import org.apache.hugegraph.auth.StandardAuthManager;
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.LocalCounter;
 import org.apache.hugegraph.backend.cache.Cache;
 import org.apache.hugegraph.backend.cache.CacheNotifier;
@@ -40,30 +42,36 @@ import org.apache.hugegraph.backend.cache.CacheNotifier.SchemaCacheNotifier;
 import org.apache.hugegraph.backend.cache.CachedGraphTransaction;
 import org.apache.hugegraph.backend.cache.CachedSchemaTransaction;
 import org.apache.hugegraph.backend.cache.CachedSchemaTransactionV2;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.SnowflakeIdGenerator;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.SnowflakeIdGenerator;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.AbstractSerializer;
 import org.apache.hugegraph.backend.serializer.SerializerFactory;
 import org.apache.hugegraph.backend.store.BackendFeatures;
+import org.apache.hugegraph.backend.store.BackendMutation;
 import org.apache.hugegraph.backend.store.BackendProviderFactory;
 import org.apache.hugegraph.backend.store.BackendStore;
 import org.apache.hugegraph.backend.store.BackendStoreInfo;
 import org.apache.hugegraph.backend.store.BackendStoreProvider;
+import org.apache.hugegraph.backend.store.BackendStoreSystemInfo;
 import org.apache.hugegraph.backend.store.raft.RaftBackendStoreProvider;
 import org.apache.hugegraph.backend.store.raft.RaftGroupManager;
 import org.apache.hugegraph.backend.store.ram.RamTable;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.backend.tx.SchemaTransaction;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.config.TypedOption;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.event.EventListener;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.exception.NotAllowException;
+import org.apache.hugegraph.id.EdgeId;
 import org.apache.hugegraph.io.HugeGraphIoRegistry;
 import org.apache.hugegraph.job.EphemeralJob;
+import org.apache.hugegraph.kafka.BrokerConfig;
+import org.apache.hugegraph.kvstore.KvStore;
 import org.apache.hugegraph.masterelection.ClusterRoleStore;
 import org.apache.hugegraph.masterelection.Config;
 import org.apache.hugegraph.masterelection.GlobalMasterInfo;
@@ -75,6 +83,7 @@ import org.apache.hugegraph.masterelection.StandardRoleElectionStateMachine;
 import org.apache.hugegraph.memory.MemoryManager;
 import org.apache.hugegraph.memory.util.RoundUtil;
 import org.apache.hugegraph.meta.MetaManager;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.perf.PerfUtil.Watched;
 import org.apache.hugegraph.rpc.RpcServiceConfig4Client;
 import org.apache.hugegraph.rpc.RpcServiceConfig4Server;
@@ -90,6 +99,7 @@ import org.apache.hugegraph.structure.HugeEdgeProperty;
 import org.apache.hugegraph.structure.HugeFeatures;
 import org.apache.hugegraph.structure.HugeVertex;
 import org.apache.hugegraph.structure.HugeVertexProperty;
+import org.apache.hugegraph.structure.KvElement;
 import org.apache.hugegraph.task.EphemeralJobQueue;
 import org.apache.hugegraph.task.ServerInfoManager;
 import org.apache.hugegraph.task.TaskManager;
@@ -97,6 +107,7 @@ import org.apache.hugegraph.task.TaskScheduler;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.type.define.GraphMode;
 import org.apache.hugegraph.type.define.GraphReadMode;
+import org.apache.hugegraph.type.define.LoadMode;
 import org.apache.hugegraph.util.ConfigUtil;
 import org.apache.hugegraph.util.DateUtil;
 import org.apache.hugegraph.util.E;
@@ -146,47 +157,65 @@ public class StandardHugeGraph implements HugeGraph {
             CoreOptions.VERTEX_DEFAULT_LABEL,
             CoreOptions.VERTEX_ENCODE_PK_NUMBER,
             CoreOptions.STORE_GRAPH,
-            CoreOptions.STORE
+            CoreOptions.STORE,
+            CoreOptions.TASK_RETRY,
+            CoreOptions.OLTP_QUERY_BATCH_SIZE,
+            CoreOptions.OLTP_QUERY_BATCH_AVG_DEGREE_RATIO,
+            CoreOptions.OLTP_QUERY_BATCH_EXPECT_DEGREE,
+            CoreOptions.SCHEMA_INDEX_REBUILD_USING_PUSHDOWN,
+            CoreOptions.QUERY_TRUST_INDEX,
+            CoreOptions.QUERY_MAX_INDEXES_AVAILABLE,
+            CoreOptions.QUERY_DEDUP_OPTION
     );
 
     private static final Logger LOG = Log.logger(StandardHugeGraph.class);
-
+    private final String name;
+    private final StandardHugeGraphParams params;
+    private final HugeConfig configuration;
+    private final EventHub schemaEventHub;
+    private final EventHub graphEventHub;
+    private final EventHub indexEventHub;
+    private final LocalCounter localCounter;
+    private final RateLimiter writeRateLimiter;
+    private final RateLimiter readRateLimiter;
+    private final TaskManager taskManager;
+    private final HugeFeatures features;
+    private final BackendStoreProvider storeProvider;
+    private final TinkerPopTransaction tx;
+    private final RamTable ramtable;
+    private final String schedulerType;
+    // todo:zzz 先不考虑虚拟图
+    //private final VirtualGraph vGraph;
+    private final MetaManager metaManager = MetaManager.instance();
+    private final LoadMode loadMode = LoadMode.NORMAL;
+    private final Boolean checkAdjacentVertexExist = null;
     private volatile boolean started;
     private volatile boolean closed;
     private volatile GraphMode mode;
     private volatile GraphReadMode readMode;
     private volatile HugeVariables variables;
-
-    private final String name;
-
-    private final StandardHugeGraphParams params;
-
-    private final HugeConfig configuration;
-
-    private final EventHub schemaEventHub;
-    private final EventHub graphEventHub;
-    private final EventHub indexEventHub;
-
-    private final LocalCounter localCounter;
-    private final RateLimiter writeRateLimiter;
-    private final RateLimiter readRateLimiter;
-    private final TaskManager taskManager;
+    private String graphSpace;
     private AuthManager authManager;
-
     private RoleElectionStateMachine roleElectionStateMachine;
-
-    private final HugeFeatures features;
-
-    private final BackendStoreProvider storeProvider;
-    private final TinkerPopTransaction tx;
-
-    private final RamTable ramtable;
-
-    private final String schedulerType;
+    private String nickname;
+    private String creator;
+    private Date createTime;
+    private Date updateTime;
+    private KvStore kvStore;
 
     public StandardHugeGraph(HugeConfig config) {
+
+        /**
+         * pd.peers passed from config is required for the case of isolated instantiate
+         */
+        if (config.containsKey("pd.peers")) {
+            String pdPeers = config.getString("pd.peers");
+            BrokerConfig.setPdPeers(pdPeers);
+        }
+
         this.params = new StandardHugeGraphParams();
         this.configuration = config;
+        this.graphSpace = config.get(CoreOptions.GRAPH_SPACE);
 
         this.schemaEventHub = new EventHub("schema");
         this.graphEventHub = new EventHub("graph");
@@ -201,6 +230,11 @@ public class StandardHugeGraph implements HugeGraph {
         this.readRateLimiter = readLimit > 0 ?
                                RateLimiter.create(readLimit) : null;
 
+        String graphSpace = config.getString("graphSpace");
+        if (!StringUtils.isEmpty(graphSpace) && StringUtils.isEmpty(this.graphSpace())) {
+            this.graphSpace(graphSpace);
+        }
+
         boolean ramtableEnable = config.get(CoreOptions.QUERY_RAMTABLE_ENABLE);
         if (ramtableEnable) {
             long vc = config.get(CoreOptions.QUERY_RAMTABLE_VERTICES_CAPACITY);
@@ -212,12 +246,20 @@ public class StandardHugeGraph implements HugeGraph {
 
         this.taskManager = TaskManager.instance();
 
+        //todo：双刺赋值？？
+        //this.features = new HugeFeatures(this, true);
+
         this.name = config.get(CoreOptions.STORE);
         this.started = false;
         this.closed = false;
         this.mode = GraphMode.NONE;
-        this.readMode = GraphReadMode.OLTP_ONLY;
+        // todo：zzz olap only to this
+        this.readMode = GraphReadMode.valueOf(
+                config.get(CoreOptions.GRAPH_READ_MODE));
         this.schedulerType = config.get(CoreOptions.SCHEDULER_TYPE);
+
+        // todo：zzz 此处为啥加锁，锁粒度是否可以优化
+        LockUtil.init(this.spaceGraphName());
 
         MemoryManager.setMemoryMode(
                 MemoryManager.MemoryMode.fromValue(config.get(CoreOptions.MEMORY_MODE)));
@@ -226,17 +268,16 @@ public class StandardHugeGraph implements HugeGraph {
                 config.get(CoreOptions.ONE_QUERY_MAX_MEMORY_CAPACITY));
         RoundUtil.setAlignment(config.get(CoreOptions.MEMORY_ALIGNMENT));
 
-        LockUtil.init(this.name);
-
         try {
             this.storeProvider = this.loadStoreProvider();
         } catch (Exception e) {
-            LockUtil.destroy(this.name);
+            LockUtil.destroy(this.spaceGraphName());
             String message = "Failed to load backend store provider";
             LOG.error("{}: {}", message, e.getMessage());
-            throw new HugeException(message, e);
+            throw new HugeException(message);
         }
 
+        // todo：zzz 这段有点问题，貌似内部版是默认连接，放到 graphManager 中了。社区版可能要保留非 hstore 的操作
         if (isHstore()) {
             // TODO: parameterize the remaining configurations
             MetaManager.instance().connect("hg", MetaManager.MetaDriverType.PD,
@@ -255,10 +296,34 @@ public class StandardHugeGraph implements HugeGraph {
             this.authManager = new StandardAuthManager(this.params);
             this.variables = null;
         } catch (Exception e) {
+            // todo:zzz check this.name 现在都要改成 this.spaceGraphName
             this.storeProvider.close();
-            LockUtil.destroy(this.name);
+            LockUtil.destroy(this.spaceGraphName());
             throw e;
         }
+
+        // todo:zzz 虚拟图
+        //virtualGraphEnable = config.get(CoreOptions.VIRTUAL_GRAPH_ENABLE);
+        //if (virtualGraphEnable) {
+        //    this.vGraph = new VirtualGraph(this.params);
+        //} else {
+        //    this.vGraph = null;
+        //}
+    }
+
+    @Override
+    public BackendStoreProvider storeProvider() {
+        return this.storeProvider;
+    }
+
+    @Override
+    public String graphSpace() {
+        return this.graphSpace;
+    }
+
+    @Override
+    public void graphSpace(String graphSpace) {
+        this.graphSpace = graphSpace;
     }
 
     @Override
@@ -267,7 +332,18 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public String spaceGraphName() {
+        return this.graphSpace + "-" + this.name;
+    }
+
+    @Override
     public HugeGraph hugegraph() {
+        return this;
+    }
+
+    // todo：zzz 这个 required 是干啥的捏
+    @Override
+    public HugeGraph hugegraph(boolean required) {
         return this;
     }
 
@@ -276,12 +352,24 @@ public class StandardHugeGraph implements HugeGraph {
         return this.storeProvider.type();
     }
 
-    @Override
+    // todo：zzz 内部版没这玩意
     public BackendStoreInfo backendStoreInfo() {
         // Just for trigger Tx.getOrNewTransaction, then load 3 stores
         // TODO: pass storeProvider.metaStore()
         this.systemTransaction();
         return new BackendStoreInfo(this.configuration, this.storeProvider);
+    }
+
+    @Override
+    public String backendVersion() {
+        //return this.storeProvider.version();
+        return "111";
+    }
+
+    @Override
+    public BackendStoreSystemInfo backendStoreSystemInfo() {
+        //return new BackendStoreSystemInfo(this.schemaTransaction());
+        return null;
     }
 
     @Override
@@ -336,11 +424,21 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public void started(boolean started) {
+        this.started = started;
+    }
+
+    @Override
     public boolean closed() {
         if (this.closed && !this.tx.closed()) {
             LOG.warn("The tx is not closed while graph '{}' is closed", this);
         }
         return this.closed;
+    }
+
+    @Override
+    public void closeTx() {
+
     }
 
     @Override
@@ -370,6 +468,61 @@ public class StandardHugeGraph implements HugeGraph {
         // Just for trigger Tx.getOrNewTransaction, then load 3 stores
         this.schemaTransaction();
         this.storeProvider.waitReady(rpcServer);
+    }
+
+    @Override
+    public String nickname() {
+        return "";
+    }
+
+    @Override
+    public void nickname(String nickname) {
+
+    }
+
+    @Override
+    public String creator() {
+        return "";
+    }
+
+    @Override
+    public void creator(String creator) {
+
+    }
+
+    @Override
+    public Date createTime() {
+        return null;
+    }
+
+    @Override
+    public void createTime(Date createTime) {
+
+    }
+
+    @Override
+    public Date updateTime() {
+        return null;
+    }
+
+    @Override
+    public void updateTime(Date updateTime) {
+
+    }
+
+    @Override
+    public void refreshUpdateTime() {
+
+    }
+
+    @Override
+    public void waitStarted() {
+
+    }
+
+    @Override
+    public void serverStarted() {
+
     }
 
     @Override
@@ -435,6 +588,21 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public void truncateGraph() {
+
+    }
+
+    @Override
+    public void kvStore(KvStore kvStore) {
+
+    }
+
+    @Override
+    public KvStore kvStore() {
+        return null;
+    }
+
+    @Override
     public void initSystemInfo() {
         try {
             this.taskScheduler().init();
@@ -455,6 +623,10 @@ public class StandardHugeGraph implements HugeGraph {
             LockUtil.unlock(this.name, LockUtil.GRAPH_LOCK);
         }
         LOG.info("Graph '{}' has created snapshot", this.name);
+    }
+
+    @Override
+    public void updatePropertyKey(PropertyKey old, PropertyKey update) {
     }
 
     @Override
@@ -541,16 +713,6 @@ public class StandardHugeGraph implements HugeGraph {
         return this.storeProvider.loadSystemStore(this.configuration);
     }
 
-    @Watched
-    private ISchemaTransaction schemaTransaction() {
-        this.checkGraphNotClosed();
-        /*
-         * NOTE: each schema operation will be auto committed,
-         * Don't need to open tinkerpop tx by readWrite() and commit manually.
-         */
-        return this.tx.schemaTransaction();
-    }
-
     private SysTransaction systemTransaction() {
         this.checkGraphNotClosed();
         /*
@@ -629,6 +791,16 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public Vertex updateVertex(Vertex oldVertex, Object... newVertex) {
+        return null;
+    }
+
+    @Override
+    public Vertex updateVertex(Vertex oldVertex, Vertex newVertex) {
+        return null;
+    }
+
+    @Override
     public void removeVertex(Vertex vertex) {
         this.graphTransaction().removeVertex((HugeVertex) vertex);
     }
@@ -663,6 +835,11 @@ public class StandardHugeGraph implements HugeGraph {
     @Override
     public Edge addEdge(Edge edge) {
         return this.graphTransaction().addEdge((HugeEdge) edge);
+    }
+
+    @Override
+    public Edge updateEdge(Edge oldEdge, Edge newEdge) {
+        return null;
     }
 
     @Override
@@ -707,11 +884,21 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public Vertex vertex(Object id, boolean skipCache) {
+        return null;
+    }
+
+    @Override
     public Iterator<Vertex> vertices(Object... objects) {
         if (objects.length == 0) {
             return this.graphTransaction().queryVertices();
         }
         return this.graphTransaction().queryVertices(objects);
+    }
+
+    @Override
+    public Iterator<Vertex> vertices(boolean skipCache, Object... vertexIds) {
+        return null;
     }
 
     @Override
@@ -725,6 +912,11 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public Iterator<Vertex> adjacentVertexWithProp(Object... ids) {
+        return null;
+    }
+
+    @Override
     public boolean checkAdjacentVertexExist() {
         return this.graphTransaction().checkAdjacentVertexExist();
     }
@@ -732,6 +924,11 @@ public class StandardHugeGraph implements HugeGraph {
     @Override
     public Edge edge(Object object) {
         return this.graphTransaction().queryEdge(object);
+    }
+
+    @Override
+    public Edge edge(Object id, boolean skipCache) {
+        return null;
     }
 
     @Override
@@ -743,14 +940,42 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public Iterator<Edge> edges(boolean skipCache, Object... edgeIds) {
+        return null;
+    }
+
+    @Override
     @Watched
     public Iterator<Edge> edges(Query query) {
         return this.graphTransaction().queryEdges(query);
     }
 
     @Override
+    @Watched
+    public Iterator<Iterator<Edge>> edges(Iterator<Query> queryList) {
+        return null;
+    }
+
+    @Override
+    @Watched
+    public Iterator<EdgeId> edgeIds(Query query) {
+        return null;
+    }
+
+    @Override
+    @Watched
+    public Iterator<Iterator<EdgeId>> edgeIds(Iterator<Query> queryList) {
+        return null;
+    }
+
+    @Override
     public Iterator<Vertex> adjacentVertices(Iterator<Edge> edges) {
         return this.graphTransaction().queryAdjacentVertices(edges);
+    }
+
+    @Override
+    public Iterator<Vertex> adjacentVertices(Iterator<Edge> edges, boolean withProperty) {
+        return null;
     }
 
     @Override
@@ -761,6 +986,11 @@ public class StandardHugeGraph implements HugeGraph {
     @Override
     public Number queryNumber(Query query) {
         return this.graphTransaction().queryNumber(query);
+    }
+
+    @Override
+    public List<KvElement> queryAgg(Query query) {
+        return null;
     }
 
     @Override
@@ -792,6 +1022,15 @@ public class StandardHugeGraph implements HugeGraph {
     }
 
     @Override
+    public List<String> mapPkId2Name(Collection<Id> ids) {
+        return List.of();
+    }
+
+    public List<String> mapIlId2Name(Collection<Id> ids) {
+        return List.of();
+    }
+
+    @Override
     public PropertyKey propertyKey(Id id) {
         PropertyKey pk = this.schemaTransaction().getPropertyKey(id);
         E.checkArgument(pk != null, "Undefined property key with id: '%s'", id);
@@ -817,6 +1056,11 @@ public class StandardHugeGraph implements HugeGraph {
     @Override
     public boolean existsPropertyKey(String name) {
         return this.schemaTransaction().getPropertyKey(name) != null;
+    }
+
+    @Override
+    public boolean existsOlapTable(PropertyKey key) {
+        return false;
     }
 
     @Override
@@ -1055,6 +1299,15 @@ public class StandardHugeGraph implements HugeGraph {
         return config;
     }
 
+    public void clearSchedulerAndLock() {
+        this.taskManager.forceRemoveScheduler(this.params);
+        try {
+            LockUtil.destroy(this.spaceGraphName());
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
     @Override
     public HugeFeatures features() {
         return this.features;
@@ -1073,6 +1326,11 @@ public class StandardHugeGraph implements HugeGraph {
     @Override
     public SchemaManager schema() {
         return new SchemaManager(this.schemaTransaction(), this);
+    }
+
+    @Override
+    public SchemaTransaction schemaTransaction() {
+        return null;
     }
 
     @Override
@@ -1184,14 +1442,14 @@ public class StandardHugeGraph implements HugeGraph {
                 this.schemaEventHub, proxy));
     }
 
-    private void closeTx() {
-        try {
-            if (this.tx.isOpen()) {
-                this.tx.close();
-            }
-        } finally {
-            this.tx.destroyTransaction();
-        }
+    @Override
+    public void applyMutation(BackendMutation mutation) {
+
+    }
+
+    @Override
+    public Vertex addVertex(Vertex vertex) {
+        return null;
     }
 
     private void waitUntilAllTasksCompleted() {
@@ -1203,10 +1461,172 @@ public class StandardHugeGraph implements HugeGraph {
         }
     }
 
+    private static final class Txs {
+
+        private final ISchemaTransaction schemaTx;
+        private final SysTransaction systemTx;
+        private final GraphTransaction graphTx;
+        private long openedTime;
+
+        public Txs(ISchemaTransaction schemaTx, SysTransaction systemTx,
+                   GraphTransaction graphTx) {
+            assert schemaTx != null && systemTx != null && graphTx != null;
+            this.schemaTx = schemaTx;
+            this.systemTx = systemTx;
+            this.graphTx = graphTx;
+            this.openedTime = DateUtil.now().getTime();
+        }
+
+        public void commit() {
+            this.graphTx.commit();
+        }
+
+        public void rollback() {
+            this.graphTx.rollback();
+        }
+
+        public void close() {
+            try {
+                this.graphTx.close();
+            } catch (Exception e) {
+                LOG.error("Failed to close GraphTransaction", e);
+            }
+
+            try {
+                this.systemTx.close();
+            } catch (Exception e) {
+                LOG.error("Failed to close SystemTransaction", e);
+            }
+
+            try {
+                this.schemaTx.close();
+            } catch (Exception e) {
+                LOG.error("Failed to close SchemaTransaction", e);
+            }
+        }
+
+        public void openedTime(long time) {
+            this.openedTime = time;
+        }
+
+        public long openedTime() {
+            return this.openedTime;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("{schemaTx=%s,systemTx=%s,graphTx=%s}",
+                                 this.schemaTx, this.systemTx, this.graphTx);
+        }
+    }
+
+    private static class SysTransaction extends GraphTransaction {
+
+        public SysTransaction(HugeGraphParams graph, BackendStore store) {
+            super(graph, store);
+            this.autoCommit(true);
+        }
+    }
+
+    private static class AbstractCacheNotifier implements CacheNotifier {
+
+        public static final Logger LOG = Log.logger(AbstractCacheNotifier.class);
+
+        private final EventHub hub;
+        private final EventListener cacheEventListener;
+
+        public AbstractCacheNotifier(EventHub hub, CacheNotifier proxy) {
+            this.hub = hub;
+            this.cacheEventListener = event -> {
+                try {
+                    LOG.info("Received event: {}", event);
+                    Object[] args = event.args();
+                    E.checkArgument(args.length > 0 && args[0] instanceof String,
+                                    "Expect event action argument");
+                    String action = (String) args[0];
+                    LOG.debug("Event action: {}", action);
+                    if (Cache.ACTION_INVALIDED.equals(action)) {
+                        event.checkArgs(String.class, HugeType.class, Object.class);
+                        HugeType type = (HugeType) args[1];
+                        Object ids = args[2];
+                        if (ids instanceof Id[]) {
+                            LOG.debug("Calling proxy.invalid2 with type: {}, IDs: {}", type,
+                                      Arrays.toString((Id[]) ids));
+                            proxy.invalid2(type, (Id[]) ids);
+                        } else if (ids instanceof Id) {
+                            LOG.debug("Calling proxy.invalid with type: {}, ID: {}", type, ids);
+                            proxy.invalid(type, (Id) ids);
+                        } else {
+                            LOG.error("Unexpected argument: {}", ids);
+                            E.checkArgument(false, "Unexpected argument: %s", ids);
+                        }
+                        return true;
+                    } else if (Cache.ACTION_CLEARED.equals(action)) {
+                        event.checkArgs(String.class, HugeType.class);
+                        HugeType type = (HugeType) args[1];
+                        LOG.debug("Calling proxy.clear with type: {}", type);
+                        proxy.clear(type);
+                        return true;
+                    }
+                } catch (Exception e) {
+                    LOG.error("Error processing cache event: {}", e.getMessage(), e);
+                }
+                LOG.warn("Event {} not handled", event);
+                return false;
+            };
+            this.hub.listen(Events.CACHE, this.cacheEventListener);
+            LOG.info("Cache event listener registered successfully. cacheEventListener {}",
+                     this.cacheEventListener);
+        }
+
+        @Override
+        public void close() {
+            this.hub.unlisten(Events.CACHE, this.cacheEventListener);
+        }
+
+        @Override
+        public void invalid(HugeType type, Id id) {
+            this.hub.notify(Events.CACHE, Cache.ACTION_INVALID, type, id);
+        }
+
+        @Override
+        public void invalid2(HugeType type, Object[] ids) {
+            this.hub.notify(Events.CACHE, Cache.ACTION_INVALID, type, ids);
+        }
+
+        @Override
+        public void clear(HugeType type) {
+            this.hub.notify(Events.CACHE, Cache.ACTION_CLEAR, type);
+        }
+
+        @Override
+        public void reload() {
+            // pass
+        }
+    }
+
+    private static class HugeSchemaCacheNotifier
+            extends AbstractCacheNotifier
+            implements SchemaCacheNotifier {
+
+        public HugeSchemaCacheNotifier(EventHub hub, CacheNotifier proxy) {
+            super(hub, proxy);
+        }
+    }
+
+    private static class HugeGraphCacheNotifier
+            extends AbstractCacheNotifier
+            implements GraphCacheNotifier {
+
+        public HugeGraphCacheNotifier(EventHub hub, CacheNotifier proxy) {
+            super(hub, proxy);
+        }
+    }
+
     private class StandardHugeGraphParams implements HugeGraphParams {
 
-        private HugeGraph graph = StandardHugeGraph.this;
         private final EphemeralJobQueue ephemeralJobQueue = new EphemeralJobQueue(this);
+        private HugeGraph graph = StandardHugeGraph.this;
 
         private void graph(HugeGraph graph) {
             this.graph = graph;
@@ -1552,166 +1972,6 @@ public class StandardHugeGraph implements HugeGraph {
                 txs.close();
             }
             this.transactions.remove();
-        }
-    }
-
-    private static final class Txs {
-
-        private final ISchemaTransaction schemaTx;
-        private final SysTransaction systemTx;
-        private final GraphTransaction graphTx;
-        private long openedTime;
-
-        public Txs(ISchemaTransaction schemaTx, SysTransaction systemTx,
-                   GraphTransaction graphTx) {
-            assert schemaTx != null && systemTx != null && graphTx != null;
-            this.schemaTx = schemaTx;
-            this.systemTx = systemTx;
-            this.graphTx = graphTx;
-            this.openedTime = DateUtil.now().getTime();
-        }
-
-        public void commit() {
-            this.graphTx.commit();
-        }
-
-        public void rollback() {
-            this.graphTx.rollback();
-        }
-
-        public void close() {
-            try {
-                this.graphTx.close();
-            } catch (Exception e) {
-                LOG.error("Failed to close GraphTransaction", e);
-            }
-
-            try {
-                this.systemTx.close();
-            } catch (Exception e) {
-                LOG.error("Failed to close SystemTransaction", e);
-            }
-
-            try {
-                this.schemaTx.close();
-            } catch (Exception e) {
-                LOG.error("Failed to close SchemaTransaction", e);
-            }
-        }
-
-        public void openedTime(long time) {
-            this.openedTime = time;
-        }
-
-        public long openedTime() {
-            return this.openedTime;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("{schemaTx=%s,systemTx=%s,graphTx=%s}",
-                                 this.schemaTx, this.systemTx, this.graphTx);
-        }
-    }
-
-    private static class SysTransaction extends GraphTransaction {
-
-        public SysTransaction(HugeGraphParams graph, BackendStore store) {
-            super(graph, store);
-            this.autoCommit(true);
-        }
-    }
-
-    private static class AbstractCacheNotifier implements CacheNotifier {
-
-        public static final Logger LOG = Log.logger(AbstractCacheNotifier.class);
-
-        private final EventHub hub;
-        private final EventListener cacheEventListener;
-
-        public AbstractCacheNotifier(EventHub hub, CacheNotifier proxy) {
-            this.hub = hub;
-            this.cacheEventListener = event -> {
-                try {
-                    LOG.info("Received event: {}", event);
-                    Object[] args = event.args();
-                    E.checkArgument(args.length > 0 && args[0] instanceof String,
-                                    "Expect event action argument");
-                    String action = (String) args[0];
-                    LOG.debug("Event action: {}", action);
-                    if (Cache.ACTION_INVALIDED.equals(action)) {
-                        event.checkArgs(String.class, HugeType.class, Object.class);
-                        HugeType type = (HugeType) args[1];
-                        Object ids = args[2];
-                        if (ids instanceof Id[]) {
-                            LOG.debug("Calling proxy.invalid2 with type: {}, IDs: {}", type, Arrays.toString((Id[]) ids));
-                            proxy.invalid2(type, (Id[]) ids);
-                        } else if (ids instanceof Id) {
-                            LOG.debug("Calling proxy.invalid with type: {}, ID: {}", type, ids);
-                            proxy.invalid(type, (Id) ids);
-                        } else {
-                            LOG.error("Unexpected argument: {}", ids);
-                            E.checkArgument(false, "Unexpected argument: %s", ids);
-                        }
-                        return true;
-                    } else if (Cache.ACTION_CLEARED.equals(action)) {
-                        event.checkArgs(String.class, HugeType.class);
-                        HugeType type = (HugeType) args[1];
-                        LOG.debug("Calling proxy.clear with type: {}", type);
-                        proxy.clear(type);
-                        return true;
-                    }
-                } catch (Exception e) {
-                    LOG.error("Error processing cache event: {}", e.getMessage(), e);
-                }
-                LOG.warn("Event {} not handled",event);
-                return false;
-            };
-            this.hub.listen(Events.CACHE, this.cacheEventListener);
-            LOG.info("Cache event listener registered successfully. cacheEventListener {}",this.cacheEventListener);
-        }
-
-        @Override
-        public void close() {
-            this.hub.unlisten(Events.CACHE, this.cacheEventListener);
-        }
-
-        @Override
-        public void invalid(HugeType type, Id id) {
-            this.hub.notify(Events.CACHE, Cache.ACTION_INVALID, type, id);
-        }
-
-        @Override
-        public void invalid2(HugeType type, Object[] ids) {
-            this.hub.notify(Events.CACHE, Cache.ACTION_INVALID, type, ids);
-        }
-
-        @Override
-        public void clear(HugeType type) {
-            this.hub.notify(Events.CACHE, Cache.ACTION_CLEAR, type);
-        }
-
-        @Override
-        public void reload() {
-            // pass
-        }
-    }
-
-    private static class HugeSchemaCacheNotifier
-            extends AbstractCacheNotifier
-            implements SchemaCacheNotifier {
-
-        public HugeSchemaCacheNotifier(EventHub hub, CacheNotifier proxy) {
-            super(hub, proxy);
-        }
-    }
-
-    private static class HugeGraphCacheNotifier
-            extends AbstractCacheNotifier
-            implements GraphCacheNotifier {
-
-        public HugeGraphCacheNotifier(EventHub hub, CacheNotifier proxy) {
-            super(hub, proxy);
         }
     }
 }

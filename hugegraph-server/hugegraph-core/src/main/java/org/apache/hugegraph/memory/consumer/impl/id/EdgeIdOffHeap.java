@@ -22,10 +22,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdUtil;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdUtil;
+import org.apache.hugegraph.id.SplicingIdGenerator;
 import org.apache.hugegraph.memory.consumer.OffHeapObject;
 import org.apache.hugegraph.memory.pool.MemoryPool;
 import org.apache.hugegraph.structure.HugeVertex;

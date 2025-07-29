@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.stream.IntStream;
 
 import org.apache.http.client.utils.URIBuilder;
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.BackendSession.AbstractBackendSession;
 import org.apache.hugegraph.backend.store.BackendSessionPool;
 import org.apache.hugegraph.config.HugeConfig;

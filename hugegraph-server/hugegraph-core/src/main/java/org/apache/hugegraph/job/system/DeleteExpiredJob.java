@@ -18,7 +18,7 @@
 package org.apache.hugegraph.job.system;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.job.EphemeralJob;
 import org.apache.hugegraph.job.EphemeralJobBuilder;
 import org.apache.hugegraph.job.system.JobCounters.JobCounter;

@@ -24,12 +24,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.IdUtil;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.IdUtil;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntryIterator;
 import org.apache.hugegraph.type.HugeType;
@@ -53,8 +53,6 @@ import com.datastax.driver.core.querybuilder.Using;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.hugegraph.util.HashUtil;
-
 public class CassandraTables {
 
     public static final String LABEL_INDEX = "label_index";
@@ -74,6 +72,22 @@ public class CassandraTables {
     private static final DataType TYPE_EXPIRED_TIME = DataType.bigint();
 
     private static final long COMMIT_DELETE_BATCH = Query.COMMIT_BATCH;
+
+    private static Statement setTtl(BuiltStatement statement,
+                                    CassandraBackendEntry.Row entry) {
+        long ttl = entry.ttl();
+        if (ttl != 0L) {
+            int calcTtl = (int) Math.ceil(ttl / 1000D);
+            Using usingTtl = QueryBuilder.ttl(calcTtl);
+            if (statement instanceof Insert) {
+                ((Insert) statement).using(usingTtl);
+            } else {
+                assert statement instanceof Update;
+                ((Update) statement).using(usingTtl);
+            }
+        }
+        return statement;
+    }
 
     public static class Meta extends CassandraTable {
 
@@ -344,6 +358,19 @@ public class CassandraTables {
             this.direction = direction;
         }
 
+        private static String table(Directions direction) {
+            assert direction == Directions.OUT || direction == Directions.IN;
+            return direction.type().string() + TABLE_SUFFIX;
+        }
+
+        public static CassandraTable out(String store) {
+            return new Edge(store, Directions.OUT);
+        }
+
+        public static CassandraTable in(String store) {
+            return new Edge(store, Directions.IN);
+        }
+
         protected String edgesTable(Directions direction) {
             return joinTableName(this.store, table(direction));
         }
@@ -561,19 +588,6 @@ public class CassandraTables {
 
             vertex.subRow(edge.row());
             return vertex;
-        }
-
-        private static String table(Directions direction) {
-            assert direction == Directions.OUT || direction == Directions.IN;
-            return direction.type().string() + TABLE_SUFFIX;
-        }
-
-        public static CassandraTable out(String store) {
-            return new Edge(store, Directions.OUT);
-        }
-
-        public static CassandraTable in(String store) {
-            return new Edge(store, Directions.IN);
         }
     }
 
@@ -975,21 +989,5 @@ public class CassandraTables {
         protected OlapRangeDoubleIndex(String store, String table) {
             super(joinTableName(store, table));
         }
-    }
-
-    private static Statement setTtl(BuiltStatement statement,
-                                    CassandraBackendEntry.Row entry) {
-        long ttl = entry.ttl();
-        if (ttl != 0L) {
-            int calcTtl = (int) Math.ceil(ttl / 1000D);
-            Using usingTtl = QueryBuilder.ttl(calcTtl);
-            if (statement instanceof Insert) {
-                ((Insert) statement).using(usingTtl);
-            } else {
-                assert statement instanceof Update;
-                ((Update) statement).using(usingTtl);
-            }
-        }
-        return statement;
     }
 }

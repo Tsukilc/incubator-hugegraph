@@ -19,9 +19,9 @@ package org.apache.hugegraph.unit.id;
 
 import java.util.List;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.SplicingIdGenerator;
 import org.apache.hugegraph.schema.PropertyKey;
 import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.structure.HugeVertex;

@@ -18,7 +18,7 @@
 package org.apache.hugegraph.backend.store.palo;
 
 import org.apache.hugegraph.backend.LocalCounter;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.store.BackendFeatures;
 import org.apache.hugegraph.backend.store.BackendStore;
 import org.apache.hugegraph.backend.store.BackendStoreProvider;

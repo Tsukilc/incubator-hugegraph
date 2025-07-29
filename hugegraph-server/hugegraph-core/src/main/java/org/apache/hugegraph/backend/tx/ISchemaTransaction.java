@@ -17,11 +17,10 @@
 
 package org.apache.hugegraph.backend.tx;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.IndexLabel;
 import org.apache.hugegraph.schema.PropertyKey;
@@ -33,6 +32,7 @@ import org.apache.hugegraph.type.define.GraphMode;
 import org.apache.hugegraph.type.define.SchemaStatus;
 
 public interface ISchemaTransaction {
+
     List<PropertyKey> getPropertyKeys();
 
     Id removePropertyKey(Id pkey);

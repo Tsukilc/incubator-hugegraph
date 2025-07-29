@@ -19,7 +19,7 @@ package org.apache.hugegraph.job;
 
 import java.util.Map;
 
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.job.computer.Computer;
 import org.apache.hugegraph.job.computer.ComputerPool;
 import org.apache.hugegraph.util.E;

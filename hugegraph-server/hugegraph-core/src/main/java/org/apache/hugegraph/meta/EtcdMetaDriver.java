@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.meta.lock.EtcdDistributedLock;
 import org.apache.hugegraph.meta.lock.LockResult;
 import org.apache.hugegraph.type.define.CollectionType;
@@ -276,6 +276,11 @@ public class EtcdMetaDriver implements MetaDriver {
             resultMap.put(key, value);
         }
         return resultMap;
+    }
+
+    @Override
+    public LockResult lock(String key, long ttl) {
+        return null;
     }
 
     @Override

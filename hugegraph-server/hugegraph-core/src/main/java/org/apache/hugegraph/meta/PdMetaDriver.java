@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.meta.lock.LockResult;
 import org.apache.hugegraph.meta.lock.PdDistributedLock;
 import org.apache.hugegraph.pd.client.KvClient;
@@ -158,6 +158,11 @@ public class PdMetaDriver implements MetaDriver {
     }
 
     @Override
+    public LockResult lock(String key, long ttl) {
+        return null;
+    }
+
+    @Override
     public LockResult tryLock(String key, long ttl, long timeout) {
         return this.lock.lock(key, ttl);
     }
@@ -207,6 +212,25 @@ public class PdMetaDriver implements MetaDriver {
             return response.getSucceed();
         } catch (PDException e) {
             throw new HugeException("Failed to keepTTLAlive '%s' to pd", e, key);
+        }
+    }
+
+    public static class PDAuthConfig {
+
+        private static String service;
+        private static String token;
+
+        public static void setAuthority(String service, String token) {
+            PDAuthConfig.service = service;
+            PDAuthConfig.token = token;
+        }
+
+        public static String service() {
+            return service;
+        }
+
+        public static String token() {
+            return token;
         }
     }
 }

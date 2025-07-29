@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.job.UserJob;
 import org.apache.hugegraph.job.algorithm.comm.AbstractCommAlgorithm;
 import org.apache.hugegraph.schema.SchemaManager;

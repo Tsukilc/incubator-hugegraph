@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry.BackendColumnIterator;
 import org.apache.hugegraph.backend.store.BackendSession.AbstractBackendSession;

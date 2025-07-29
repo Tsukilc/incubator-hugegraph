@@ -37,16 +37,16 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.RegionInfo;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageState;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Aggregate.AggregateFunc;
-import org.apache.hugegraph.backend.query.Condition.Relation;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Aggregate.AggregateFunc;
+import org.apache.hugegraph.query.Condition.Relation;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.BinaryBackendEntry;
 import org.apache.hugegraph.backend.serializer.BinaryEntryIterator;
 import org.apache.hugegraph.backend.store.BackendEntry;
@@ -67,10 +67,8 @@ import com.google.common.collect.ImmutableList;
 
 public class HbaseTable extends BackendTable<HbaseSessions.Session, BackendEntry> {
 
-    private static final Logger LOG = Log.logger(HbaseStore.class);
-
     protected static final byte[] CF = "f".getBytes();
-
+    private static final Logger LOG = Log.logger(HbaseStore.class);
     private final HbaseShardSplitter shardSplitter;
 
     private final boolean enablePartition;
@@ -302,32 +300,6 @@ public class HbaseTable extends BackendTable<HbaseSessions.Session, BackendEntry
             super(table);
         }
 
-        @Override
-        public List<Shard> getSplits(HbaseSessions.Session session, long splitSize) {
-            E.checkArgument(splitSize >= MIN_SHARD_SIZE,
-                            "The split-size must be >= %s bytes, but got %s",
-                            MIN_SHARD_SIZE, splitSize);
-            List<Shard> shards = new ArrayList<>();
-            String namespace = session.namespace();
-            String table = this.table();
-
-            // Calc data size for each region
-            Map<String, Double> regionSizes = regionSizes(session, namespace,
-                                                          table);
-            // Get token range of each region
-            Map<String, Range> regionRanges = regionRanges(session, namespace,
-                                                           table);
-            // Split regions to shards
-            for (Map.Entry<String, Double> rs : regionSizes.entrySet()) {
-                String region = rs.getKey();
-                double size = rs.getValue();
-                Range range = regionRanges.get(region);
-                int count = calcSplitCount(size, splitSize);
-                shards.addAll(range.splitEven(count));
-            }
-            return shards;
-        }
-
         private static Map<String, Double> regionSizes(HbaseSessions.Session session,
                                                        String namespace,
                                                        String table) {
@@ -374,6 +346,32 @@ public class HbaseTable extends BackendTable<HbaseSessions.Session, BackendEntry
 
         private static int calcSplitCount(double totalSize, long splitSize) {
             return (int) Math.ceil(totalSize / splitSize);
+        }
+
+        @Override
+        public List<Shard> getSplits(HbaseSessions.Session session, long splitSize) {
+            E.checkArgument(splitSize >= MIN_SHARD_SIZE,
+                            "The split-size must be >= %s bytes, but got %s",
+                            MIN_SHARD_SIZE, splitSize);
+            List<Shard> shards = new ArrayList<>();
+            String namespace = session.namespace();
+            String table = this.table();
+
+            // Calc data size for each region
+            Map<String, Double> regionSizes = regionSizes(session, namespace,
+                                                          table);
+            // Get token range of each region
+            Map<String, Range> regionRanges = regionRanges(session, namespace,
+                                                           table);
+            // Split regions to shards
+            for (Map.Entry<String, Double> rs : regionSizes.entrySet()) {
+                String region = rs.getKey();
+                double size = rs.getValue();
+                Range range = regionRanges.get(region);
+                int count = calcSplitCount(size, splitSize);
+                shards.addAll(range.splitEven(count));
+            }
+            return shards;
         }
 
         @Override

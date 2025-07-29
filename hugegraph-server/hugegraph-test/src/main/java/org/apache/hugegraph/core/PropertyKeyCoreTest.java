@@ -19,7 +19,7 @@ package org.apache.hugegraph.core;
 
 import java.util.Date;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.exception.NotAllowException;
 import org.apache.hugegraph.exception.NotFoundException;

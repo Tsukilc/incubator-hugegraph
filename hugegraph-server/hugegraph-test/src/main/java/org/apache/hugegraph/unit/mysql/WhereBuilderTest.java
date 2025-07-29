@@ -17,7 +17,7 @@
 
 package org.apache.hugegraph.unit.mysql;
 
-import org.apache.hugegraph.backend.query.Condition.RelationType;
+import org.apache.hugegraph.query.Condition.RelationType;
 import org.apache.hugegraph.backend.store.mysql.WhereBuilder;
 import org.apache.hugegraph.exception.NotSupportException;
 import org.apache.hugegraph.testutil.Assert;

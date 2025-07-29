@@ -24,19 +24,19 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.NotImplementedException;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.IdUtil;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.IdUtil;
+import org.apache.hugegraph.id.SplicingIdGenerator;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.iterator.CIter;
@@ -80,6 +80,144 @@ public class TextSerializer extends AbstractSerializer {
 
     public TextSerializer(HugeConfig config) {
         super(config);
+    }
+
+    private static String writeType(HugeType type) {
+        return type.string();
+    }
+
+    private static String writeEntryId(Id id) {
+        return IdUtil.writeString(id);
+    }
+
+    private static Id readEntryId(String id) {
+        return IdUtil.readString(id);
+    }
+
+    private static String writeEdgeName(String name) {
+        return name + EDGE_NAME_ENDING;
+    }
+
+    private static String readEdgeName(String name) {
+        E.checkState(name.endsWith(EDGE_NAME_ENDING),
+                     "Invalid edge name: %s", name);
+        return name.substring(0, name.length() - 1);
+    }
+
+    private static String writeId(Id id) {
+        if (id.number()) {
+            return JsonUtil.toJson(id.asLong());
+        } else {
+            return JsonUtil.toJson(id.asString());
+        }
+    }
+
+    private static Id readId(String id) {
+        Object value = JsonUtil.fromJson(id, Object.class);
+        if (value instanceof Number) {
+            return IdGenerator.of(((Number) value).longValue());
+        } else {
+            assert value instanceof String;
+            return IdGenerator.of(value.toString());
+        }
+    }
+
+    private static Id readId(Id id) {
+        return readId(id.asString());
+    }
+
+    private static String writeIds(Collection<Id> ids) {
+        Object[] array = new Object[ids.size()];
+        int i = 0;
+        for (Id id : ids) {
+            if (id.number()) {
+                array[i++] = id.asLong();
+            } else {
+                array[i++] = id.asString();
+            }
+        }
+        return JsonUtil.toJson(array);
+    }
+
+    private static Id[] readIds(String str) {
+        Object[] values = JsonUtil.fromJson(str, Object[].class);
+        Id[] ids = new Id[values.length];
+        for (int i = 0; i < values.length; i++) {
+            Object value = values[i];
+            if (value instanceof Number) {
+                ids[i] = IdGenerator.of(((Number) value).longValue());
+            } else {
+                assert value instanceof String;
+                ids[i] = IdGenerator.of(value.toString());
+            }
+        }
+        return ids;
+    }
+
+    private static String writeElementId(Id id, long expiredTime) {
+        Object[] array = new Object[1];
+        Object idValue = id.number() ? id.asLong() : id.asString();
+        if (expiredTime <= 0L) {
+            array[0] = id;
+        } else {
+            array[0] = ImmutableMap.of(HugeKeys.ID.string(), idValue,
+                                       HugeKeys.EXPIRED_TIME.string(),
+                                       expiredTime);
+        }
+        return JsonUtil.toJson(array);
+    }
+
+    private static IdWithExpiredTime[] readElementIds(String str) {
+        Object[] values = JsonUtil.fromJson(str, Object[].class);
+        IdWithExpiredTime[] ids = new IdWithExpiredTime[values.length];
+        for (int i = 0; i < values.length; i++) {
+            Object idValue;
+            long expiredTime;
+            if (values[i] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> map = (Map<String, Object>) values[i];
+                idValue = map.get(HugeKeys.ID.string());
+                expiredTime = ((Number) map.get(
+                        HugeKeys.EXPIRED_TIME.string())).longValue();
+            } else {
+                idValue = values[i];
+                expiredTime = 0L;
+            }
+            Id id;
+            if (idValue instanceof Number) {
+                id = IdGenerator.of(((Number) idValue).longValue());
+            } else {
+                assert idValue instanceof String;
+                id = IdGenerator.of(idValue.toString());
+            }
+            ids[i] = new IdWithExpiredTime(id, expiredTime);
+        }
+        return ids;
+    }
+
+    private static String writeLong(long value) {
+        return JsonUtil.toJson(value);
+    }
+
+    private static long readLong(String value) {
+        return Long.parseLong(value);
+    }
+
+    private static void writeUserdata(SchemaElement schema,
+                                      TextBackendEntry entry) {
+        entry.column(HugeKeys.USER_DATA, JsonUtil.toJson(schema.userdata()));
+    }
+
+    private static void readUserdata(SchemaElement schema,
+                                     TextBackendEntry entry) {
+        // Parse all user data of a schema element
+        String userdataStr = entry.column(HugeKeys.USER_DATA);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> userdata = JsonUtil.fromJson(userdataStr,
+                                                         Map.class);
+        for (Map.Entry<String, Object> e : userdata.entrySet()) {
+            schema.userdata(e.getKey(), e.getValue());
+        }
     }
 
     @Override
@@ -778,143 +916,5 @@ public class TextSerializer extends AbstractSerializer {
         list.add(writeEntryId(edgeId.otherVertexId()));
 
         return EdgeId.concat(list.toArray(new String[0]));
-    }
-
-    private static String writeType(HugeType type) {
-        return type.string();
-    }
-
-    private static String writeEntryId(Id id) {
-        return IdUtil.writeString(id);
-    }
-
-    private static Id readEntryId(String id) {
-        return IdUtil.readString(id);
-    }
-
-    private static String writeEdgeName(String name) {
-        return name + EDGE_NAME_ENDING;
-    }
-
-    private static String readEdgeName(String name) {
-        E.checkState(name.endsWith(EDGE_NAME_ENDING),
-                     "Invalid edge name: %s", name);
-        return name.substring(0, name.length() - 1);
-    }
-
-    private static String writeId(Id id) {
-        if (id.number()) {
-            return JsonUtil.toJson(id.asLong());
-        } else {
-            return JsonUtil.toJson(id.asString());
-        }
-    }
-
-    private static Id readId(String id) {
-        Object value = JsonUtil.fromJson(id, Object.class);
-        if (value instanceof Number) {
-            return IdGenerator.of(((Number) value).longValue());
-        } else {
-            assert value instanceof String;
-            return IdGenerator.of(value.toString());
-        }
-    }
-
-    private static Id readId(Id id) {
-        return readId(id.asString());
-    }
-
-    private static String writeIds(Collection<Id> ids) {
-        Object[] array = new Object[ids.size()];
-        int i = 0;
-        for (Id id : ids) {
-            if (id.number()) {
-                array[i++] = id.asLong();
-            } else {
-                array[i++] = id.asString();
-            }
-        }
-        return JsonUtil.toJson(array);
-    }
-
-    private static Id[] readIds(String str) {
-        Object[] values = JsonUtil.fromJson(str, Object[].class);
-        Id[] ids = new Id[values.length];
-        for (int i = 0; i < values.length; i++) {
-            Object value = values[i];
-            if (value instanceof Number) {
-                ids[i] = IdGenerator.of(((Number) value).longValue());
-            } else {
-                assert value instanceof String;
-                ids[i] = IdGenerator.of(value.toString());
-            }
-        }
-        return ids;
-    }
-
-    private static String writeElementId(Id id, long expiredTime) {
-        Object[] array = new Object[1];
-        Object idValue = id.number() ? id.asLong() : id.asString();
-        if (expiredTime <= 0L) {
-            array[0] = id;
-        } else {
-            array[0] = ImmutableMap.of(HugeKeys.ID.string(), idValue,
-                                       HugeKeys.EXPIRED_TIME.string(),
-                                       expiredTime);
-        }
-        return JsonUtil.toJson(array);
-    }
-
-    private static IdWithExpiredTime[] readElementIds(String str) {
-        Object[] values = JsonUtil.fromJson(str, Object[].class);
-        IdWithExpiredTime[] ids = new IdWithExpiredTime[values.length];
-        for (int i = 0; i < values.length; i++) {
-            Object idValue;
-            long expiredTime;
-            if (values[i] instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> map = (Map<String, Object>) values[i];
-                idValue = map.get(HugeKeys.ID.string());
-                expiredTime = ((Number) map.get(
-                        HugeKeys.EXPIRED_TIME.string())).longValue();
-            } else {
-                idValue = values[i];
-                expiredTime = 0L;
-            }
-            Id id;
-            if (idValue instanceof Number) {
-                id = IdGenerator.of(((Number) idValue).longValue());
-            } else {
-                assert idValue instanceof String;
-                id = IdGenerator.of(idValue.toString());
-            }
-            ids[i] = new IdWithExpiredTime(id, expiredTime);
-        }
-        return ids;
-    }
-
-    private static String writeLong(long value) {
-        return JsonUtil.toJson(value);
-    }
-
-    private static long readLong(String value) {
-        return Long.parseLong(value);
-    }
-
-    private static void writeUserdata(SchemaElement schema,
-                                      TextBackendEntry entry) {
-        entry.column(HugeKeys.USER_DATA, JsonUtil.toJson(schema.userdata()));
-    }
-
-    private static void readUserdata(SchemaElement schema,
-                                     TextBackendEntry entry) {
-        // Parse all user data of a schema element
-        String userdataStr = entry.column(HugeKeys.USER_DATA);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> userdata = JsonUtil.fromJson(userdataStr,
-                                                         Map.class);
-        for (Map.Entry<String, Object> e : userdata.entrySet()) {
-            schema.userdata(e.getKey(), e.getValue());
-        }
     }
 }

@@ -19,8 +19,9 @@ package org.apache.hugegraph.structure;
 
 import java.util.NoSuchElementException;
 
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
+import org.apache.hugegraph.id.SplicingIdGenerator;
 import org.apache.hugegraph.schema.PropertyKey;
+import org.apache.hugegraph.type.GraphType;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.util.E;
 import org.apache.tinkerpop.gremlin.structure.Property;

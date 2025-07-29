@@ -17,14 +17,14 @@
 
 package org.apache.hugegraph.unit.core;
 
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.query.Aggregate.AggregateFunc;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.query.Aggregate.AggregateFunc;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
-import org.apache.hugegraph.backend.query.IdQuery;
+import org.apache.hugegraph.query.IdQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
-import org.apache.hugegraph.backend.query.Query.Order;
+import org.apache.hugegraph.query.Query;
+import org.apache.hugegraph.query.Query.Order;
 import org.apache.hugegraph.testutil.Assert;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.type.define.HugeKeys;

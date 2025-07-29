@@ -20,8 +20,8 @@ package org.apache.hugegraph.job.schema;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
 import org.apache.hugegraph.job.SysJob;
 import org.apache.hugegraph.schema.SchemaElement;
@@ -42,34 +42,6 @@ public abstract class SchemaJob extends SysJob<Object> {
     protected static final Logger LOG = Log.logger(SchemaJob.class);
 
     private static final String SPLITOR = ":";
-
-    protected HugeType schemaType() {
-        String name = this.task().name();
-        String[] parts = name.split(SPLITOR, 3);
-        E.checkState(parts.length == 3 && parts[0] != null,
-                     "Task name should be formatted to String " +
-                     "'TYPE:ID:NAME', but got '%s'", name);
-
-        return HugeType.valueOf(parts[0]);
-    }
-
-    protected Id schemaId() {
-        String name = this.task().name();
-        String[] parts = name.split(SPLITOR, 3);
-        E.checkState(parts.length == 3 && parts[1] != null,
-                     "Task name should be formatted to String " +
-                     "'TYPE:ID:NAME', but got '%s'", name);
-        return IdGenerator.of(Long.valueOf(parts[1]));
-    }
-
-    protected String schemaName() {
-        String name = this.task().name();
-        String[] parts = name.split(SPLITOR, 3);
-        E.checkState(parts.length == 3 && parts[2] != null,
-                     "Task name should be formatted to String " +
-                     "'TYPE:ID:NAME', but got '%s'", name);
-        return parts[2];
-    }
 
     public static String formatTaskName(HugeType type, Id id, String name) {
         E.checkNotNull(type, "schema type");
@@ -121,5 +93,33 @@ public abstract class SchemaJob extends SysJob<Object> {
             throw new AssertionError(
                     "Can't call SchemaTransaction.updateSchema()", e);
         }
+    }
+
+    protected HugeType schemaType() {
+        String name = this.task().name();
+        String[] parts = name.split(SPLITOR, 3);
+        E.checkState(parts.length == 3 && parts[0] != null,
+                     "Task name should be formatted to String " +
+                     "'TYPE:ID:NAME', but got '%s'", name);
+
+        return HugeType.valueOf(parts[0]);
+    }
+
+    protected Id schemaId() {
+        String name = this.task().name();
+        String[] parts = name.split(SPLITOR, 3);
+        E.checkState(parts.length == 3 && parts[1] != null,
+                     "Task name should be formatted to String " +
+                     "'TYPE:ID:NAME', but got '%s'", name);
+        return IdGenerator.of(Long.valueOf(parts[1]));
+    }
+
+    protected String schemaName() {
+        String name = this.task().name();
+        String[] parts = name.split(SPLITOR, 3);
+        E.checkState(parts.length == 3 && parts[2] != null,
+                     "Task name should be formatted to String " +
+                     "'TYPE:ID:NAME', but got '%s'", name);
+        return parts[2];
     }
 }

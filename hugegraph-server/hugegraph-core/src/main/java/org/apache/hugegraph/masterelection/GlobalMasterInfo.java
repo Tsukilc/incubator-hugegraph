@@ -17,8 +17,8 @@
 
 package org.apache.hugegraph.masterelection;
 
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.type.define.NodeRole;
 import org.apache.hugegraph.util.E;
 
@@ -43,6 +43,14 @@ public final class GlobalMasterInfo {
 
         this.nodeId = null;
         this.nodeRole = null;
+    }
+
+    public static GlobalMasterInfo master(String nodeId) {
+        NodeInfo masterInfo = new NodeInfo(true, nodeId);
+        GlobalMasterInfo nodeInfo = new GlobalMasterInfo(masterInfo);
+        nodeInfo.nodeId = IdGenerator.of(nodeId);
+        nodeInfo.nodeRole = NodeRole.MASTER;
+        return nodeInfo;
     }
 
     public void supportElection(boolean featureSupport) {
@@ -88,14 +96,6 @@ public final class GlobalMasterInfo {
     public void changeNodeRole(NodeRole role) {
         E.checkArgument(role != null, "The server role can't be null");
         this.nodeRole = role;
-    }
-
-    public static GlobalMasterInfo master(String nodeId) {
-        NodeInfo masterInfo = new NodeInfo(true, nodeId);
-        GlobalMasterInfo nodeInfo = new GlobalMasterInfo(masterInfo);
-        nodeInfo.nodeId = IdGenerator.of(nodeId);
-        nodeInfo.nodeRole = NodeRole.MASTER;
-        return nodeInfo;
     }
 
     public static class NodeInfo {

@@ -26,10 +26,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hugegraph.HugeException;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.exception.HugeException;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.MergeIterator;
 import org.apache.hugegraph.backend.store.AbstractBackendStore;
 import org.apache.hugegraph.backend.store.BackendAction;
@@ -37,7 +37,7 @@ import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendFeatures;
 import org.apache.hugegraph.backend.store.BackendMutation;
 import org.apache.hugegraph.backend.store.BackendStoreProvider;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.exception.ConnectionException;
 import org.apache.hugegraph.type.HugeType;
@@ -86,6 +86,59 @@ public abstract class CassandraStore extends AbstractBackendStore<CassandraSessi
 
         this.registerMetaHandlers();
         LOG.debug("Store loaded: {}", store);
+    }
+
+    private static Map<String, Object> parseReplica(HugeConfig conf) {
+        Map<String, Object> replication = new HashMap<>();
+        // Replication strategy: SimpleStrategy or NetworkTopologyStrategy
+        String strategy = conf.get(CassandraOptions.CASSANDRA_STRATEGY);
+        replication.put("class", strategy);
+
+        switch (strategy) {
+            case "SimpleStrategy":
+                List<String> replicas =
+                        conf.get(CassandraOptions.CASSANDRA_REPLICATION);
+                E.checkArgument(replicas.size() == 1,
+                                "Individual factor value should be provided " +
+                                "with SimpleStrategy for Cassandra");
+                int factor = convertFactor(replicas.get(0));
+                replication.put("replication_factor", factor);
+                break;
+            case "NetworkTopologyStrategy":
+                // The replicas format is like 'dc1:2,dc2:1'
+                Map<String, String> replicaMap =
+                        conf.getMap(CassandraOptions.CASSANDRA_REPLICATION);
+                for (Map.Entry<String, String> e : replicaMap.entrySet()) {
+                    E.checkArgument(!e.getKey().isEmpty(),
+                                    "The datacenter can't be empty");
+                    replication.put(e.getKey(), convertFactor(e.getValue()));
+                }
+                break;
+            default:
+                throw new AssertionError(String.format(
+                        "Illegal replication strategy '%s', valid strategy " +
+                        "is 'SimpleStrategy' or 'NetworkTopologyStrategy'",
+                        strategy));
+        }
+        return replication;
+    }
+
+    private static int convertFactor(String factor) {
+        try {
+            return Integer.parseInt(factor);
+        } catch (NumberFormatException e) {
+            throw new BackendException(
+                    "Expect int factor value for SimpleStrategy, " +
+                    "but got '%s'", factor);
+        }
+    }
+
+    protected static final CassandraBackendEntry castBackendEntry(BackendEntry entry) {
+        assert entry instanceof CassandraBackendEntry : entry.getClass();
+        if (!(entry instanceof CassandraBackendEntry)) {
+            throw new BackendException("Cassandra store only supports CassandraBackendEntry");
+        }
+        return (CassandraBackendEntry) entry;
     }
 
     private void registerMetaHandlers() {
@@ -501,51 +554,6 @@ public abstract class CassandraStore extends AbstractBackendStore<CassandraSessi
         }
     }
 
-    private static Map<String, Object> parseReplica(HugeConfig conf) {
-        Map<String, Object> replication = new HashMap<>();
-        // Replication strategy: SimpleStrategy or NetworkTopologyStrategy
-        String strategy = conf.get(CassandraOptions.CASSANDRA_STRATEGY);
-        replication.put("class", strategy);
-
-        switch (strategy) {
-            case "SimpleStrategy":
-                List<String> replicas =
-                        conf.get(CassandraOptions.CASSANDRA_REPLICATION);
-                E.checkArgument(replicas.size() == 1,
-                                "Individual factor value should be provided " +
-                                "with SimpleStrategy for Cassandra");
-                int factor = convertFactor(replicas.get(0));
-                replication.put("replication_factor", factor);
-                break;
-            case "NetworkTopologyStrategy":
-                // The replicas format is like 'dc1:2,dc2:1'
-                Map<String, String> replicaMap =
-                        conf.getMap(CassandraOptions.CASSANDRA_REPLICATION);
-                for (Map.Entry<String, String> e : replicaMap.entrySet()) {
-                    E.checkArgument(!e.getKey().isEmpty(),
-                                    "The datacenter can't be empty");
-                    replication.put(e.getKey(), convertFactor(e.getValue()));
-                }
-                break;
-            default:
-                throw new AssertionError(String.format(
-                        "Illegal replication strategy '%s', valid strategy " +
-                        "is 'SimpleStrategy' or 'NetworkTopologyStrategy'",
-                        strategy));
-        }
-        return replication;
-    }
-
-    private static int convertFactor(String factor) {
-        try {
-            return Integer.parseInt(factor);
-        } catch (NumberFormatException e) {
-            throw new BackendException(
-                    "Expect int factor value for SimpleStrategy, " +
-                    "but got '%s'", factor);
-        }
-    }
-
     protected void clearKeyspace() {
         // Drop keyspace with non-keyspace-session
         Statement stmt = SchemaBuilder.dropKeyspace(this.keyspace).ifExists();
@@ -613,14 +621,6 @@ public abstract class CassandraStore extends AbstractBackendStore<CassandraSessi
     protected final void checkClusterConnected() {
         E.checkState(this.sessions != null && this.sessions.clusterConnected(),
                      "Cassandra cluster has not been connected");
-    }
-
-    protected static final CassandraBackendEntry castBackendEntry(BackendEntry entry) {
-        assert entry instanceof CassandraBackendEntry : entry.getClass();
-        if (!(entry instanceof CassandraBackendEntry)) {
-            throw new BackendException("Cassandra store only supports CassandraBackendEntry");
-        }
-        return (CassandraBackendEntry) entry;
     }
 
     /***************************** Store defines *****************************/

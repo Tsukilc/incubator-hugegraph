@@ -11,15 +11,15 @@
  * limitations under the License.
  */
 
-package org.apache.hugegraph.backend.id;
+package org.apache.hugegraph.id;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.structure.HugeVertex;
 import org.apache.hugegraph.util.E;

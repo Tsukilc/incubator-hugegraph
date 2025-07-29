@@ -22,10 +22,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.LocalCounter;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.serializer.TextBackendEntry;
 import org.apache.hugegraph.backend.store.AbstractBackendStore;
 import org.apache.hugegraph.backend.store.BackendAction;
@@ -56,12 +56,133 @@ public abstract class InMemoryDBStore
         extends AbstractBackendStore<BackendSession> {
 
     private static final Logger LOG = Log.logger(InMemoryDBStore.class);
+    /**
+     * InMemoryDBStore features
+     */
+    private static final BackendFeatures FEATURES = new BackendFeatures() {
 
+        @Override
+        public boolean supportsPersistence() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsSharedStorage() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsScanToken() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsScanKeyPrefix() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsScanKeyRange() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsQuerySchemaByName() {
+            // Traversal all data in memory
+            return true;
+        }
+
+        @Override
+        public boolean supportsQueryByLabel() {
+            // Traversal all data in memory
+            return true;
+        }
+
+        @Override
+        public boolean supportsQueryWithInCondition() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsQueryWithRangeCondition() {
+            return true;
+        }
+
+        @Override
+        public boolean supportsQueryWithOrderBy() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsQueryWithContains() {
+            // NOTE: hasValue tests will skip
+            return false;
+        }
+
+        @Override
+        public boolean supportsQueryWithContainsKey() {
+            // NOTE: hasKey tests will skip
+            return false;
+        }
+
+        @Override
+        public boolean supportsQueryByPage() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsQuerySortByInputIds() {
+            return true;
+        }
+
+        @Override
+        public boolean supportsDeleteEdgeByLabel() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsUpdateVertexProperty() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsMergeVertexProperty() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsUpdateEdgeProperty() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsTransaction() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsNumberType() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsAggregateProperty() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsTtl() {
+            return false;
+        }
+
+        @Override
+        public boolean supportsOlapProperties() {
+            return false;
+        }
+    };
     private final BackendStoreProvider provider;
-
     private final String store;
     private final String database;
-
     private final Map<HugeType, InMemoryDBTable> tables;
 
     public InMemoryDBStore(final BackendStoreProvider provider,
@@ -368,129 +489,4 @@ public abstract class InMemoryDBStore
             return this.provider().driverVersion();
         }
     }
-
-    /**
-     * InMemoryDBStore features
-     */
-    private static final BackendFeatures FEATURES = new BackendFeatures() {
-
-        @Override
-        public boolean supportsPersistence() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsSharedStorage() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsScanToken() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsScanKeyPrefix() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsScanKeyRange() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsQuerySchemaByName() {
-            // Traversal all data in memory
-            return true;
-        }
-
-        @Override
-        public boolean supportsQueryByLabel() {
-            // Traversal all data in memory
-            return true;
-        }
-
-        @Override
-        public boolean supportsQueryWithInCondition() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsQueryWithRangeCondition() {
-            return true;
-        }
-
-        @Override
-        public boolean supportsQueryWithOrderBy() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsQueryWithContains() {
-            // NOTE: hasValue tests will skip
-            return false;
-        }
-
-        @Override
-        public boolean supportsQueryWithContainsKey() {
-            // NOTE: hasKey tests will skip
-            return false;
-        }
-
-        @Override
-        public boolean supportsQueryByPage() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsQuerySortByInputIds() {
-            return true;
-        }
-
-        @Override
-        public boolean supportsDeleteEdgeByLabel() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsUpdateVertexProperty() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsMergeVertexProperty() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsUpdateEdgeProperty() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsTransaction() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsNumberType() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsAggregateProperty() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsTtl() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsOlapProperties() {
-            return false;
-        }
-    };
 }

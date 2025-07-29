@@ -21,7 +21,7 @@ import org.apache.hugegraph.HugeFactory;
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.backend.cache.CachedSchemaTransaction;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.testutil.Assert;
 import org.apache.hugegraph.testutil.Whitebox;
 import org.apache.hugegraph.type.HugeType;

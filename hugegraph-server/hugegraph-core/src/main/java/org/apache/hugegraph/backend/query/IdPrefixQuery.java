@@ -17,7 +17,8 @@
 
 package org.apache.hugegraph.backend.query;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.structure.HugeElement;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.util.Bytes;
@@ -75,14 +76,6 @@ public final class IdPrefixQuery extends Query {
         return false;
     }
 
-    @Override
-    public boolean test(HugeElement element) {
-        byte[] elem = element.id().asBytes();
-        int cmp = Bytes.compare(elem, this.start.asBytes());
-        boolean matchedStart = this.inclusiveStart ? cmp >= 0 : cmp > 0;
-        boolean matchedPrefix = Bytes.prefixWith(elem, this.prefix.asBytes());
-        return matchedStart && matchedPrefix;
-    }
 
     @Override
     public IdPrefixQuery copy() {

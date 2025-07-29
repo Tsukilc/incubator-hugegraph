@@ -19,7 +19,7 @@ package org.apache.hugegraph.backend.store.mysql;
 
 import java.util.List;
 
-import org.apache.hugegraph.backend.query.Condition.RelationType;
+import org.apache.hugegraph.query.Condition.RelationType;
 import org.apache.hugegraph.exception.NotSupportException;
 import org.apache.hugegraph.util.E;
 

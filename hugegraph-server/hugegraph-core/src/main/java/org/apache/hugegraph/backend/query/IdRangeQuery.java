@@ -17,7 +17,8 @@
 
 package org.apache.hugegraph.backend.query;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.structure.HugeElement;
 import org.apache.hugegraph.type.HugeType;
 import org.apache.hugegraph.util.Bytes;

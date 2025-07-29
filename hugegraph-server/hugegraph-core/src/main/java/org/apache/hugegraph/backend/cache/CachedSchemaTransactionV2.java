@@ -24,11 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.store.ram.IntObjectMap;
 import org.apache.hugegraph.backend.tx.SchemaTransactionV2;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.event.EventListener;
 import org.apache.hugegraph.meta.MetaDriver;
@@ -42,6 +42,7 @@ import org.apache.hugegraph.util.Events;
 import com.google.common.collect.ImmutableSet;
 
 public class CachedSchemaTransactionV2 extends SchemaTransactionV2 {
+
     private final Cache<Id, Object> idCache;
     private final Cache<Id, Object> nameCache;
 
@@ -51,8 +52,8 @@ public class CachedSchemaTransactionV2 extends SchemaTransactionV2 {
     private EventListener cacheEventListener;
 
     public CachedSchemaTransactionV2(MetaDriver metaDriver,
-                                   String cluster,
-                                   HugeGraphParams graphParams) {
+                                     String cluster,
+                                     HugeGraphParams graphParams) {
         super(metaDriver, cluster, graphParams);
 
         final long capacity = graphParams.configuration()
@@ -481,7 +482,7 @@ public class CachedSchemaTransactionV2 extends SchemaTransactionV2 {
     }
 
     private static class CachedTypes
-        extends ConcurrentHashMap<HugeType, Boolean> {
+            extends ConcurrentHashMap<HugeType, Boolean> {
 
         private static final long serialVersionUID = -2215549791679355996L;
     }

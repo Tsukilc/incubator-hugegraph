@@ -23,7 +23,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.apache.http.client.utils.URIBuilder;
-import org.apache.hugegraph.backend.BackendException;
+import org.apache.hugegraph.exception.BackendException;
 import org.apache.hugegraph.backend.store.mysql.MysqlSessions;
 import org.apache.hugegraph.backend.store.mysql.MysqlUtil;
 import org.apache.hugegraph.config.HugeConfig;

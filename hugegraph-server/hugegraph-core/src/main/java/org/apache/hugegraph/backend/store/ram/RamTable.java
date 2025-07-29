@@ -35,14 +35,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.ConditionQueryFlatten;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.iterator.FlatMapperIterator;
 import org.apache.hugegraph.perf.PerfUtil.Watched;
 import org.apache.hugegraph.schema.EdgeLabel;
@@ -99,6 +99,25 @@ public final class RamTable {
         this.verticesCapacityHalf = (int) (this.verticesCapacity / 2L);
         this.edgesCapacity = maxEdges + 1;
         this.reset();
+    }
+
+    private static void ensureNumberId(Id id) {
+        if (!id.number()) {
+            throw new HugeException("Only number id is supported by " +
+                                    "ramtable, but got %s id '%s'",
+                                    id.type().name().toLowerCase(), id);
+        }
+    }
+
+    private static long encode(long target, Directions direction, int label) {
+        // TODO: support property
+        assert (label & 0x0fffffff) == label;
+        assert target < 2L * Integer.MAX_VALUE : target;
+        long value = target & 0xffffffff;
+        long dir = direction == Directions.OUT ?
+                   0x00000000L : 0x80000000L;
+        value = (value << 32) | (dir | label);
+        return value;
     }
 
     private void reset() {
@@ -369,25 +388,6 @@ public final class RamTable {
         }
     }
 
-    private static void ensureNumberId(Id id) {
-        if (!id.number()) {
-            throw new HugeException("Only number id is supported by " +
-                                    "ramtable, but got %s id '%s'",
-                                    id.type().name().toLowerCase(), id);
-        }
-    }
-
-    private static long encode(long target, Directions direction, int label) {
-        // TODO: support property
-        assert (label & 0x0fffffff) == label;
-        assert target < 2L * Integer.MAX_VALUE : target;
-        long value = target & 0xffffffff;
-        long dir = direction == Directions.OUT ?
-                   0x00000000L : 0x80000000L;
-        value = (value << 32) | (dir | label);
-        return value;
-    }
-
     private class EdgeRangeIterator implements Iterator<HugeEdge> {
 
         private final int end;
@@ -472,12 +472,11 @@ public final class RamTable {
 
     private class LoadTraverser implements AutoCloseable {
 
+        private static final int ADD_BATCH = Consumers.QUEUE_WORKER_SIZE;
         private final HugeGraph graph;
         private final ExecutorService executor;
         private final List<Id> vertices;
         private final Map<Id, List<Edge>> edges;
-
-        private static final int ADD_BATCH = Consumers.QUEUE_WORKER_SIZE;
 
         public LoadTraverser() {
             this.graph = RamTable.this.graph;

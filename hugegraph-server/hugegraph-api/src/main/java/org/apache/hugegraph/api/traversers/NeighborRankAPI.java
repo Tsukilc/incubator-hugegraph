@@ -28,7 +28,7 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.api.API;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.core.GraphManager;
 import org.apache.hugegraph.structure.HugeVertex;
 import org.apache.hugegraph.traversal.algorithm.NeighborRankTraverser;
@@ -55,6 +55,15 @@ import jakarta.ws.rs.core.Context;
 public class NeighborRankAPI extends API {
 
     private static final Logger LOG = Log.logger(NeighborRankAPI.class);
+
+    private static List<NeighborRankTraverser.Step> steps(HugeGraph graph,
+                                                          RankRequest req) {
+        List<NeighborRankTraverser.Step> steps = new ArrayList<>();
+        for (Step step : req.steps) {
+            steps.add(step.jsonToStep(graph));
+        }
+        return steps;
+    }
 
     @POST
     @Timed
@@ -89,25 +98,16 @@ public class NeighborRankAPI extends API {
         return manager.serializer(g).writeList("ranks", ranks);
     }
 
-    private static List<NeighborRankTraverser.Step> steps(HugeGraph graph,
-                                                          RankRequest req) {
-        List<NeighborRankTraverser.Step> steps = new ArrayList<>();
-        for (Step step : req.steps) {
-            steps.add(step.jsonToStep(graph));
-        }
-        return steps;
-    }
-
     private static class RankRequest {
 
+        @JsonProperty("capacity")
+        public long capacity = Long.parseLong(DEFAULT_CAPACITY);
         @JsonProperty("source")
         private Object source;
         @JsonProperty("steps")
         private List<Step> steps;
         @JsonProperty("alpha")
         private double alpha;
-        @JsonProperty("capacity")
-        public long capacity = Long.parseLong(DEFAULT_CAPACITY);
 
         @Override
         public String toString() {
@@ -119,6 +119,7 @@ public class NeighborRankAPI extends API {
 
     private static class Step {
 
+        public static final int DEFAULT_CAPACITY_PER_LAYER = 100000;
         @JsonProperty("direction")
         public Directions direction;
         @JsonProperty("labels")
@@ -130,8 +131,6 @@ public class NeighborRankAPI extends API {
         public long skipDegree = 0L;
         @JsonProperty("top")
         public int top = Integer.parseInt(DEFAULT_PATHS_LIMIT);
-
-        public static final int DEFAULT_CAPACITY_PER_LAYER = 100000;
 
         @Override
         public String toString() {

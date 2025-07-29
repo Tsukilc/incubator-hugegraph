@@ -18,9 +18,9 @@
 package org.apache.hugegraph.backend.serializer;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.iterator.CIter;
 import org.apache.hugegraph.structure.HugeEdge;

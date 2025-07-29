@@ -32,19 +32,19 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.Id.IdType;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.SnowflakeIdGenerator;
-import org.apache.hugegraph.backend.id.SplicingIdGenerator;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.Id.IdType;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.SnowflakeIdGenerator;
+import org.apache.hugegraph.id.SplicingIdGenerator;
 import org.apache.hugegraph.backend.page.PageInfo;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
-import org.apache.hugegraph.backend.serializer.BytesBuffer;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
+import org.apache.hugegraph.serializer.BytesBuffer;
 import org.apache.hugegraph.backend.store.BackendTable;
 import org.apache.hugegraph.backend.store.Shard;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
@@ -87,6 +87,16 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class VertexCoreTest extends BaseCoreTest {
+
+    private static void assertContains(List<Vertex> vertices,
+                                       Object... keyValues) {
+        Assert.assertTrue(Utils.contains(vertices, new FakeObjects.FakeVertex(keyValues)));
+    }
+
+    private static void assertNotContains(List<Vertex> vertices,
+                                          Object... keyValues) {
+        Assert.assertFalse(Utils.contains(vertices, new FakeObjects.FakeVertex(keyValues)));
+    }
 
     @Before
     public void initSchema() {
@@ -9159,9 +9169,9 @@ public class VertexCoreTest extends BaseCoreTest {
                                          "city", "Hongkong", "age", 15);
         Vertex vertex2 = graph.addVertex(T.label, "person", "name", "始皇",
                                          "city", "Hongkong", "age", 18);
-        Vertex vertex3 = graph.addVertex(T.label, "person", "name", "秦始皇2",
+        Vertex vertex3 = graph.addVertex(T.label, "person", "name", "秦始皇 2",
                                          "city", "Beijing", "age", 21);
-        Vertex vertex4 = graph.addVertex(T.label, "person", "name", "秦始皇3",
+        Vertex vertex4 = graph.addVertex(T.label, "person", "name", "秦始皇 3",
                                          "city", "Beijing", "age", 23);
         Vertex vertex5 = graph.addVertex(T.label, "person", "name", "秦始皇帝",
                                          "city", "Beijing", "age", 29);
@@ -9185,7 +9195,7 @@ public class VertexCoreTest extends BaseCoreTest {
         Assert.assertEquals(1, vertices.size());
         Assert.assertTrue(vertices.contains(vertex5));
 
-        vertices = g.V().has("name", Text.contains("(秦始皇2|秦始皇3)")).toList();
+        vertices = g.V().has("name", Text.contains("(秦始皇 2|秦始皇 3)")).toList();
         Assert.assertEquals(2, vertices.size());
         Assert.assertTrue(vertices.contains(vertex3));
         Assert.assertTrue(vertices.contains(vertex4));
@@ -9382,15 +9392,5 @@ public class VertexCoreTest extends BaseCoreTest {
                                        .toList();
         Assert.assertTrue(vertices.size() <= 1);
         return vertices.size() == 1 ? vertices.get(0) : null;
-    }
-
-    private static void assertContains(List<Vertex> vertices,
-                                       Object... keyValues) {
-        Assert.assertTrue(Utils.contains(vertices, new FakeObjects.FakeVertex(keyValues)));
-    }
-
-    private static void assertNotContains(List<Vertex> vertices,
-                                          Object... keyValues) {
-        Assert.assertFalse(Utils.contains(vertices, new FakeObjects.FakeVertex(keyValues)));
     }
 }

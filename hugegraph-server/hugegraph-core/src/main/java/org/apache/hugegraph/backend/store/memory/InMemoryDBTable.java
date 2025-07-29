@@ -25,15 +25,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Aggregate.AggregateFunc;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Aggregate.AggregateFunc;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
 import org.apache.hugegraph.backend.query.IdPrefixQuery;
 import org.apache.hugegraph.backend.query.IdRangeQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.query.QueryResults;
 import org.apache.hugegraph.backend.serializer.TextBackendEntry;
 import org.apache.hugegraph.backend.store.BackendEntry;
@@ -68,6 +68,31 @@ public class InMemoryDBTable extends BackendTable<BackendSession,
         super(type.name());
         this.store = store;
         this.shardSplitter = new InMemoryShardSplitter(this.table());
+    }
+
+    private static boolean matchCondition(BackendEntry item, Condition c) {
+        // TODO: Compatible with BackendEntry
+        TextBackendEntry entry = (TextBackendEntry) item;
+
+        // Not supported by memory
+        if (!(c instanceof Condition.Relation)) {
+            throw new BackendException("Unsupported condition: " + c);
+        }
+
+        Condition.Relation r = (Condition.Relation) c;
+        String key = r.serialKey().toString();
+
+        // TODO: deal with others Relation like: <, >=, ...
+        if (r.relation() == Condition.RelationType.CONTAINS_KEY) {
+            return entry.contains(r.serialValue().toString());
+        } else if (r.relation() == Condition.RelationType.CONTAINS_VALUE) {
+            return entry.containsValue(r.serialValue().toString());
+        } else if (r.relation() == Condition.RelationType.EQ) {
+            return entry.contains(key, r.serialValue().toString());
+        } else if (entry.contains(key)) {
+            return r.test(entry.column(key));
+        }
+        return false;
     }
 
     @Override
@@ -306,31 +331,6 @@ public class InMemoryDBTable extends BackendTable<BackendSession,
 
     protected long sizeOfBackendEntry(BackendEntry entry) {
         return 1L;
-    }
-
-    private static boolean matchCondition(BackendEntry item, Condition c) {
-        // TODO: Compatible with BackendEntry
-        TextBackendEntry entry = (TextBackendEntry) item;
-
-        // Not supported by memory
-        if (!(c instanceof Condition.Relation)) {
-            throw new BackendException("Unsupported condition: " + c);
-        }
-
-        Condition.Relation r = (Condition.Relation) c;
-        String key = r.serialKey().toString();
-
-        // TODO: deal with others Relation like: <, >=, ...
-        if (r.relation() == Condition.RelationType.CONTAINS_KEY) {
-            return entry.contains(r.serialValue().toString());
-        } else if (r.relation() == Condition.RelationType.CONTAINS_VALUE) {
-            return entry.containsValue(r.serialValue().toString());
-        } else if (r.relation() == Condition.RelationType.EQ) {
-            return entry.contains(key, r.serialValue().toString());
-        } else if (entry.contains(key)) {
-            return r.test(entry.column(key));
-        }
-        return false;
     }
 
     private class InMemoryShardSplitter extends ShardSplitter<BackendSession> {

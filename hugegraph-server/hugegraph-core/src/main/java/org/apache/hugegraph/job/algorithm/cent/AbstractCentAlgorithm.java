@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.iterator.MapperIterator;
 import org.apache.hugegraph.job.UserJob;
 import org.apache.hugegraph.job.algorithm.AbstractAlgorithm;

@@ -20,9 +20,9 @@ package org.apache.hugegraph.core;
 import java.util.Date;
 import java.util.List;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.exception.NoIndexException;
 import org.apache.hugegraph.exception.NotFoundException;

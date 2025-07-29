@@ -25,8 +25,8 @@ import java.util.Map;
 
 import org.apache.hugegraph.HugeGraph;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.schema.IndexLabel;
 import org.apache.hugegraph.schema.PropertyKey;
 import org.apache.hugegraph.schema.SchemaManager;
@@ -47,13 +47,11 @@ public class HugeServerInfo {
 
     // Unit millisecond
     private static final long EXPIRED_INTERVAL = TaskManager.SCHEDULE_PERIOD * 10;
-
+    private final Id id;
     private NodeRole role;
     private Date updateTime;
     private int maxLoad;
     private int load;
-    private final Id id;
-
     private transient boolean updated = false;
 
     public HugeServerInfo(String name, NodeRole role) {
@@ -73,6 +71,19 @@ public class HugeServerInfo {
         this.load = 0;
         this.role = role;
         this.updateTime = DateUtil.now();
+    }
+
+    public static HugeServerInfo fromVertex(Vertex vertex) {
+        HugeServerInfo serverInfo = new HugeServerInfo((Id) vertex.id());
+        for (var iter = vertex.properties(); iter.hasNext(); ) {
+            VertexProperty<Object> prop = iter.next();
+            serverInfo.property(prop.key(), prop.value());
+        }
+        return serverInfo;
+    }
+
+    public static Schema schema(HugeGraphParams graph) {
+        return new Schema(graph);
     }
 
     public Id id() {
@@ -200,25 +211,12 @@ public class HugeServerInfo {
         return map;
     }
 
-    public static HugeServerInfo fromVertex(Vertex vertex) {
-        HugeServerInfo serverInfo = new HugeServerInfo((Id) vertex.id());
-        for (var iter = vertex.properties(); iter.hasNext(); ) {
-            VertexProperty<Object> prop = iter.next();
-            serverInfo.property(prop.key(), prop.value());
-        }
-        return serverInfo;
-    }
-
     public <V> boolean suitableFor(HugeTask<V> task, long now) {
         if (task.computer() != this.role.computer()) {
             return false;
         }
         return this.updateTime.getTime() + EXPIRED_INTERVAL >= now &&
                this.load() + task.load() <= this.maxLoad;
-    }
-
-    public static Schema schema(HugeGraphParams graph) {
-        return new Schema(graph);
     }
 
     public static final class P {

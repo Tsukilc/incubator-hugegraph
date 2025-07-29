@@ -24,12 +24,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.store.BackendStore;
 import org.apache.hugegraph.backend.store.ram.IntObjectMap;
 import org.apache.hugegraph.backend.tx.SchemaTransaction;
-import org.apache.hugegraph.config.CoreOptions;
+import org.apache.hugegraph.options.CoreOptions;
 import org.apache.hugegraph.event.EventHub;
 import org.apache.hugegraph.event.EventListener;
 import org.apache.hugegraph.perf.PerfUtil.Watched;
@@ -66,6 +66,16 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         this.arrayCaches = attachment;
 
         this.listenChanges();
+    }
+
+    private static Id generateId(HugeType type, Id id) {
+        // NOTE: it's slower performance to use:
+        // String.format("%x-%s", type.code(), name)
+        return IdGenerator.of(type.string() + "-" + id.asString());
+    }
+
+    private static Id generateId(HugeType type, String name) {
+        return IdGenerator.of(type.string() + "-" + name);
     }
 
     @Override
@@ -163,7 +173,7 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         return this.arrayCaches.cachedTypes();
     }
 
-    private void clearCache(boolean notify) {
+    public void clearCache(boolean notify) {
         this.idCache.clear();
         this.nameCache.clear();
         this.arrayCaches.clear();
@@ -202,16 +212,6 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
 
         // remove from optimized array cache
         this.arrayCaches.remove(type, id);
-    }
-
-    private static Id generateId(HugeType type, Id id) {
-        // NOTE: it's slower performance to use:
-        // String.format("%x-%s", type.code(), name)
-        return IdGenerator.of(type.string() + "-" + id.asString());
-    }
-
-    private static Id generateId(HugeType type, String name) {
-        return IdGenerator.of(type.string() + "-" + name);
     }
 
     @Override

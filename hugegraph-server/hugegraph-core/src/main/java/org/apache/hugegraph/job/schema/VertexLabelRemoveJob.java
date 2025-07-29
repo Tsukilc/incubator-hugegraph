@@ -20,9 +20,9 @@ package org.apache.hugegraph.job.schema;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hugegraph.HugeException;
+import org.apache.hugegraph.exception.HugeException;
 import org.apache.hugegraph.HugeGraphParams;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.tx.GraphTransaction;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
 import org.apache.hugegraph.schema.EdgeLabel;
@@ -33,17 +33,6 @@ import org.apache.hugegraph.util.LockUtil;
 import com.google.common.collect.ImmutableSet;
 
 public class VertexLabelRemoveJob extends SchemaJob {
-
-    @Override
-    public String type() {
-        return REMOVE_SCHEMA;
-    }
-
-    @Override
-    public Object execute() {
-        removeVertexLabel(this.params(), this.schemaId());
-        return null;
-    }
 
     private static void removeVertexLabel(HugeGraphParams graph, Id id) {
         GraphTransaction graphTx = graph.graphTransaction();
@@ -101,5 +90,16 @@ public class VertexLabelRemoveJob extends SchemaJob {
         } finally {
             locks.unlock();
         }
+    }
+
+    @Override
+    public String type() {
+        return REMOVE_SCHEMA;
+    }
+
+    @Override
+    public Object execute() {
+        removeVertexLabel(this.params(), this.schemaId());
+        return null;
     }
 }

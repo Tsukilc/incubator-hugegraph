@@ -23,14 +23,14 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.EdgeId;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
-import org.apache.hugegraph.backend.id.IdUtil;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.EdgeId;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
+import org.apache.hugegraph.id.IdUtil;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.config.HugeConfig;
 import org.apache.hugegraph.schema.EdgeLabel;
@@ -68,6 +68,35 @@ public abstract class TableSerializer extends AbstractSerializer {
 
     public TableSerializer(HugeConfig config) {
         super(config);
+    }
+
+    private static <T> T schemaColumn(TableBackendEntry entry, HugeKeys key) {
+        assert entry.type().isSchema();
+
+        T value = entry.column(key);
+        E.checkState(value != null,
+                     "Not found key '%s' from entry %s", key, entry);
+        return value;
+    }
+
+    private static <T extends SerialEnum> T schemaEnum(TableBackendEntry entry,
+                                                       HugeKeys key,
+                                                       Class<T> clazz) {
+        Number value = schemaColumn(entry, key);
+        return SerialEnum.fromCode(clazz, value.byteValue());
+    }
+
+    private static <T extends SerialEnum> T schemaEnumOrDefault(
+            TableBackendEntry entry,
+            HugeKeys key, Class<T> clazz,
+            T defaultValue) {
+        assert entry.type().isSchema();
+
+        Number value = entry.column(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        return SerialEnum.fromCode(clazz, value.byteValue());
     }
 
     @Override
@@ -683,33 +712,4 @@ public abstract class TableSerializer extends AbstractSerializer {
 
     protected abstract void readUserdata(SchemaElement schema,
                                          TableBackendEntry entry);
-
-    private static <T> T schemaColumn(TableBackendEntry entry, HugeKeys key) {
-        assert entry.type().isSchema();
-
-        T value = entry.column(key);
-        E.checkState(value != null,
-                     "Not found key '%s' from entry %s", key, entry);
-        return value;
-    }
-
-    private static <T extends SerialEnum> T schemaEnum(TableBackendEntry entry,
-                                                       HugeKeys key,
-                                                       Class<T> clazz) {
-        Number value = schemaColumn(entry, key);
-        return SerialEnum.fromCode(clazz, value.byteValue());
-    }
-
-    private static <T extends SerialEnum> T schemaEnumOrDefault(
-            TableBackendEntry entry,
-            HugeKeys key, Class<T> clazz,
-            T defaultValue) {
-        assert entry.type().isSchema();
-
-        Number value = entry.column(key);
-        if (value == null) {
-            return defaultValue;
-        }
-        return SerialEnum.fromCode(clazz, value.byteValue());
-    }
 }

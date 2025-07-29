@@ -29,6 +29,7 @@ import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
 import com.alipay.sofa.jraft.rpc.RpcRequestProcessor;
 import com.google.protobuf.Message;
 
+//todo: zzz 啥玩意这是
 public class SetLeaderProcessor
         extends RpcRequestProcessor<SetLeaderRequest> {
 

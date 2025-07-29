@@ -27,7 +27,7 @@ import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.job.UserJob;
 import org.apache.hugegraph.traversal.algorithm.FusiformSimilarityTraverser;
 import org.apache.hugegraph.type.define.Directions;
@@ -48,6 +48,22 @@ public class KCoreAlgorithm extends AbstractCommAlgorithm {
     public static final String KEY_MERGED = "merged";
 
     public static final int DEFAULT_K = 3;
+
+    protected static int k(Map<String, Object> parameters) {
+        if (!parameters.containsKey(KEY_K)) {
+            return DEFAULT_K;
+        }
+        int k = ParameterUtil.parameterInt(parameters, KEY_K);
+        E.checkArgument(k > 1, "The k of kcore must be > 1, but got %s", k);
+        return k;
+    }
+
+    protected static boolean merged(Map<String, Object> parameters) {
+        if (!parameters.containsKey(KEY_MERGED)) {
+            return false;
+        }
+        return ParameterUtil.parameterBoolean(parameters, KEY_MERGED);
+    }
 
     @Override
     public String name() {
@@ -82,26 +98,33 @@ public class KCoreAlgorithm extends AbstractCommAlgorithm {
         }
     }
 
-    protected static int k(Map<String, Object> parameters) {
-        if (!parameters.containsKey(KEY_K)) {
-            return DEFAULT_K;
-        }
-        int k = ParameterUtil.parameterInt(parameters, KEY_K);
-        E.checkArgument(k > 1, "The k of kcore must be > 1, but got %s", k);
-        return k;
-    }
-
-    protected static boolean merged(Map<String, Object> parameters) {
-        if (!parameters.containsKey(KEY_MERGED)) {
-            return false;
-        }
-        return ParameterUtil.parameterBoolean(parameters, KEY_MERGED);
-    }
-
     private static class Traverser extends AlgoTraverser {
 
         public Traverser(UserJob<Object> job, int workers) {
             super(job, ALGO_NAME, workers);
+        }
+
+        private static void mergeKcores(Set<Set<Id>> kcores, Set<Id> kcore) {
+            boolean merged = false;
+            /*
+             * Iterate to collect merging kcores firstly, because merging
+             * kcores will be removed from all kcores.
+             * Besides one new kcore may connect to multiple existing kcores.
+             */
+            Set<Set<Id>> mergingKcores = new HashSet<>();
+            for (Set<Id> existedKcore : kcores) {
+                if (CollectionUtil.hasIntersection(existedKcore, kcore)) {
+                    mergingKcores.add(existedKcore);
+                    merged = true;
+                }
+            }
+            if (merged) {
+                for (Set<Id> mergingKcore : mergingKcores) {
+                    kcores.remove(mergingKcore);
+                    kcore.addAll(mergingKcore);
+                }
+            }
+            kcores.add(kcore);
         }
 
         public Object kcore(String sourceLabel, String sourceCLabel,
@@ -146,48 +169,12 @@ public class KCoreAlgorithm extends AbstractCommAlgorithm {
 
             return kcoresJson.asJson();
         }
-
-        private static void mergeKcores(Set<Set<Id>> kcores, Set<Id> kcore) {
-            boolean merged = false;
-            /*
-             * Iterate to collect merging kcores firstly, because merging
-             * kcores will be removed from all kcores.
-             * Besides one new kcore may connect to multiple existing kcores.
-             */
-            Set<Set<Id>> mergingKcores = new HashSet<>();
-            for (Set<Id> existedKcore : kcores) {
-                if (CollectionUtil.hasIntersection(existedKcore, kcore)) {
-                    mergingKcores.add(existedKcore);
-                    merged = true;
-                }
-            }
-            if (merged) {
-                for (Set<Id> mergingKcore : mergingKcores) {
-                    kcores.remove(mergingKcore);
-                    kcore.addAll(mergingKcore);
-                }
-            }
-            kcores.add(kcore);
-        }
     }
 
     public static class KcoreTraverser extends FusiformSimilarityTraverser {
 
         public KcoreTraverser(HugeGraph graph) {
             super(graph);
-        }
-
-        public Set<Id> kcore(Iterator<Vertex> vertices, Directions direction,
-                             String label, int k, double alpha, long degree) {
-            int minNeighbors = (int) Math.floor(1.0 / alpha * k);
-            SimilarsMap map = fusiformSimilarity(vertices, direction, label,
-                                                 minNeighbors, alpha, k - 1,
-                                                 0, null, 0, degree,
-                                                 NO_LIMIT, NO_LIMIT, true);
-            if (map.isEmpty()) {
-                return ImmutableSet.of();
-            }
-            return extractKcore(map, k);
         }
 
         @SuppressWarnings("unchecked")
@@ -260,6 +247,19 @@ public class KCoreAlgorithm extends AbstractCommAlgorithm {
                 kcores.addAll(similar.ids());
             }
             return kcores;
+        }
+
+        public Set<Id> kcore(Iterator<Vertex> vertices, Directions direction,
+                             String label, int k, double alpha, long degree) {
+            int minNeighbors = (int) Math.floor(1.0 / alpha * k);
+            SimilarsMap map = fusiformSimilarity(vertices, direction, label,
+                                                 minNeighbors, alpha, k - 1,
+                                                 0, null, 0, degree,
+                                                 NO_LIMIT, NO_LIMIT, true);
+            if (map.isEmpty()) {
+                return ImmutableSet.of();
+            }
+            return extractKcore(map, k);
         }
     }
 

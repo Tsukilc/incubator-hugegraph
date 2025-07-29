@@ -27,8 +27,8 @@ import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hugegraph.HugeGraphParams;
 import org.apache.hugegraph.auth.SchemaDefine.Entity;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.type.define.Cardinality;
 import org.apache.hugegraph.type.define.DataType;
@@ -69,6 +69,15 @@ public class HugeProject extends Entity {
         this.graphs = graphs;
         this.id = id;
         this.targetId = targetId;
+    }
+
+    public static HugeProject fromVertex(Vertex vertex) {
+        HugeProject target = new HugeProject((Id) vertex.id());
+        return fromVertex(vertex, target);
+    }
+
+    public static HugeProject.Schema schema(HugeGraphParams graph) {
+        return new HugeProject.Schema(graph);
     }
 
     @Override
@@ -229,18 +238,9 @@ public class HugeProject extends Entity {
         return true;
     }
 
-    public static HugeProject fromVertex(Vertex vertex) {
-        HugeProject target = new HugeProject((Id) vertex.id());
-        return fromVertex(vertex, target);
-    }
-
     @Override
     public String name() {
         return this.name;
-    }
-
-    public static HugeProject.Schema schema(HugeGraphParams graph) {
-        return new HugeProject.Schema(graph);
     }
 
     public static final class P {

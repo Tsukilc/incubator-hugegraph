@@ -23,7 +23,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Stack;
 
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.job.UserJob;
 import org.apache.hugegraph.structure.HugeEdge;
 import org.apache.hugegraph.type.define.Directions;
@@ -108,9 +108,9 @@ public abstract class BfsTraverser<T extends BfsTraverser.Node>
 
     public static class Node {
 
+        private final int distance;
         private Id[] parents;
         private int pathCount;
-        private final int distance;
 
         public Node(Node parentNode) {
             this(0, parentNode.distance + 1);

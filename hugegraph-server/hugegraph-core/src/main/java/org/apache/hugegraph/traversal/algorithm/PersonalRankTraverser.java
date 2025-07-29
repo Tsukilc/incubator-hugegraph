@@ -24,7 +24,7 @@ import java.util.Set;
 import java.util.function.BiFunction;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.VertexLabel;
 import org.apache.hugegraph.structure.HugeVertex;
@@ -44,6 +44,12 @@ public class PersonalRankTraverser extends HugeTraverser {
         this.alpha = alpha;
         this.degree = degree;
         this.maxDepth = maxDepth;
+    }
+
+    private static void removeAll(Map<Id, Double> map, Set<Id> keys) {
+        for (Id key : keys) {
+            map.remove(key);
+        }
     }
 
     public Map<Id, Double> personalRank(Id source, String label,
@@ -152,12 +158,6 @@ public class PersonalRankTraverser extends HugeTraverser {
         } else {
             assert targetLabel.equals(vertexLabel.id());
             return Directions.IN;
-        }
-    }
-
-    private static void removeAll(Map<Id, Double> map, Set<Id> keys) {
-        for (Id key : keys) {
-            map.remove(key);
         }
     }
 

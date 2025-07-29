@@ -29,8 +29,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
-import org.apache.hugegraph.HugeException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.exception.HugeException;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.concurrent.KeyLock;
 import org.apache.hugegraph.concurrent.LockManager;
 import org.apache.hugegraph.concurrent.RowLock;
@@ -42,31 +42,23 @@ import com.google.common.collect.ImmutableSet;
 
 public final class LockUtil {
 
-    private static final Logger LOG = Log.logger(LockUtil.class);
-
     public static final String WRITE = "write";
     public static final String READ = "read";
-
     public static final String INDEX_LABEL_DELETE = "il_delete";
     public static final String INDEX_LABEL_REBUILD = "il_rebuild";
     public static final String INDEX_LABEL_ADD_UPDATE = "il_update";
-
     public static final String VERTEX_LABEL_DELETE = "vl_delete";
     public static final String VERTEX_LABEL_ADD_UPDATE = "vl_update";
-
     public static final String EDGE_LABEL_DELETE = "el_delete";
     public static final String EDGE_LABEL_ADD_UPDATE = "el_update";
-
     public static final String PROPERTY_KEY_ADD_UPDATE = "pk_update";
     public static final String PROJECT_UPDATE = "project_update";
-
     public static final String KEY_LOCK = "key_lock";
     public static final String ROW_LOCK = "row_lock";
     public static final String REENTRANT_LOCK = "reentrant_lock";
-
     public static final String GRAPH_LOCK = "graph_lock";
-
     public static final long WRITE_WAIT_TIMEOUT = 30L;
+    private static final Logger LOG = Log.logger(LockUtil.class);
 
     public static void init(String graph) {
         LockManager.instance().create(join(graph, INDEX_LABEL_DELETE));

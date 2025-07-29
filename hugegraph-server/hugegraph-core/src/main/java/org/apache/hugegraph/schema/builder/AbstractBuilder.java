@@ -21,10 +21,9 @@ import java.util.Set;
 import java.util.function.Function;
 
 import org.apache.hugegraph.HugeGraph;
-import org.apache.hugegraph.backend.id.Id;
-import org.apache.hugegraph.backend.id.IdGenerator;
+import org.apache.hugegraph.id.Id;
+import org.apache.hugegraph.id.IdGenerator;
 import org.apache.hugegraph.backend.tx.ISchemaTransaction;
-import org.apache.hugegraph.backend.tx.SchemaTransaction;
 import org.apache.hugegraph.exception.ExistedException;
 import org.apache.hugegraph.schema.EdgeLabel;
 import org.apache.hugegraph.schema.IndexLabel;

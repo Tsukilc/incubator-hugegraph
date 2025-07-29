@@ -27,14 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
-import org.apache.hugegraph.backend.BackendException;
-import org.apache.hugegraph.backend.id.Id;
+import org.apache.hugegraph.exception.BackendException;
+import org.apache.hugegraph.id.Id;
 import org.apache.hugegraph.backend.page.PageState;
-import org.apache.hugegraph.backend.query.Aggregate;
-import org.apache.hugegraph.backend.query.Condition;
-import org.apache.hugegraph.backend.query.ConditionQuery;
-import org.apache.hugegraph.backend.query.IdQuery;
-import org.apache.hugegraph.backend.query.Query;
+import org.apache.hugegraph.query.Aggregate;
+import org.apache.hugegraph.query.Condition;
+import org.apache.hugegraph.query.ConditionQuery;
+import org.apache.hugegraph.query.IdQuery;
+import org.apache.hugegraph.query.Query;
 import org.apache.hugegraph.backend.store.BackendEntry;
 import org.apache.hugegraph.backend.store.BackendTable;
 import org.apache.hugegraph.backend.store.Shard;
@@ -58,15 +58,13 @@ public abstract class MysqlTable
     private static final Logger LOG = Log.logger(MysqlTable.class);
 
     private static final String DECIMAL = "DECIMAL";
-
+    private final MysqlShardSplitter shardSplitter;
     // The template cache for insert and delete statements
     private String insertTemplate;
     private String insertTemplateTtl;
     private String deleteTemplate;
     private String updateIfPresentTemplate;
     private String updateIfAbsentTemplate;
-
-    private final MysqlShardSplitter shardSplitter;
 
     public MysqlTable(String table) {
         super(table);
@@ -77,6 +75,22 @@ public abstract class MysqlTable
         this.updateIfAbsentTemplate = null;
 
         this.shardSplitter = new MysqlShardSplitter(this.table());
+    }
+
+    public static String formatKey(HugeKeys key) {
+        return key.name();
+    }
+
+    public static HugeKeys parseKey(String name) {
+        return HugeKeys.valueOf(name.toUpperCase());
+    }
+
+    public static List<String> formatKeys(List<HugeKeys> keys) {
+        List<String> names = new ArrayList<>(keys.size());
+        for (HugeKeys key : keys) {
+            names.add(formatKey(key));
+        }
+        return names;
     }
 
     @Override
@@ -790,22 +804,6 @@ public abstract class MysqlTable
     protected BackendEntry mergeEntries(BackendEntry e1, BackendEntry e2) {
         // Return the next entry (not merged)
         return e2;
-    }
-
-    public static String formatKey(HugeKeys key) {
-        return key.name();
-    }
-
-    public static HugeKeys parseKey(String name) {
-        return HugeKeys.valueOf(name.toUpperCase());
-    }
-
-    public static List<String> formatKeys(List<HugeKeys> keys) {
-        List<String> names = new ArrayList<>(keys.size());
-        for (HugeKeys key : keys) {
-            names.add(formatKey(key));
-        }
-        return names;
     }
 
     private static class MysqlShardSplitter extends ShardSplitter<MysqlSessions.Session> {
