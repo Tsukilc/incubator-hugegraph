@@ -22,8 +22,20 @@
         <value>/tmp/hbase</value>
     </property>
     <property>
+        <name>hbase.cluster.distributed</name>
+        <value>false</value>
+    </property>
+    <property>
         <name>hbase.zookeeper.property.dataDir</name>
         <value>/tmp/zookeeper</value>
+    </property>
+    <property>
+        <name>hbase.zookeeper.quorum</name>
+        <value>127.0.0.1</value>
+    </property>
+    <property>
+        <name>hbase.zookeeper.property.clientPortAddress</name>
+        <value>127.0.0.1</value>
     </property>
     <property>
         <name>hbase.zookeeper.property.maxClientCnxns</name>
