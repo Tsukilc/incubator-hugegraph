@@ -1,26 +1,28 @@
 /*
+ * Copyright 2017 HugeGraph Authors
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to You under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.hugegraph.type;
 
-import org.apache.hugegraph.type.define.SerialEnum;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.hugegraph.type.define.SerialEnum;
 
 public enum HugeType implements SerialEnum {
 
@@ -32,7 +34,6 @@ public enum HugeType implements SerialEnum {
     PROPERTY_KEY(3, "PK"),
     INDEX_LABEL(4, "IL"),
 
-    META(40, "M"),
     COUNTER(50, "C"),
 
     /* Data types */
@@ -65,14 +66,21 @@ public enum HugeType implements SerialEnum {
     SHARD_INDEX(175, "HI"),
     UNIQUE_INDEX(178, "UI"),
 
-    TASK(180, "TASK"),
-    VARIABLE(185, "VA"),
+    TASK(180, "T"),
     SERVER(181, "SERVER"),
+
+    VARIABLE(185,"VA"),
+
+    KV_TYPE(200, "KV"),
+    KV_RAW(201, "KVR"),
 
     // System schema
     SYS_SCHEMA(250, "SS"),
 
     MAX_TYPE(255, "~");
+
+    private byte type = 0;
+    private String name;
 
     private static final Map<String, HugeType> ALL_NAME = new HashMap<>();
 
@@ -83,21 +91,10 @@ public enum HugeType implements SerialEnum {
         }
     }
 
-    private final String name;
-    private byte type = 0;
-
     HugeType(int type, String name) {
         assert type < 256;
         this.type = (byte) type;
         this.name = name;
-    }
-
-    public static HugeType fromString(String type) {
-        return ALL_NAME.get(type);
-    }
-
-    public static HugeType fromCode(byte code) {
-        return SerialEnum.fromCode(HugeType.class, code);
     }
 
     @Override
@@ -115,48 +112,57 @@ public enum HugeType implements SerialEnum {
 
     public boolean isSchema() {
         return this == HugeType.VERTEX_LABEL ||
-                this == HugeType.EDGE_LABEL ||
-                this == HugeType.PROPERTY_KEY ||
-                this == HugeType.INDEX_LABEL;
+               this == HugeType.EDGE_LABEL ||
+               this == HugeType.PROPERTY_KEY ||
+               this == HugeType.INDEX_LABEL;
     }
 
     public boolean isGraph() {
-        return this.isVertex() || this.isEdge();
+        return this.isVertex() || this.isEdge() ;
     }
 
     public boolean isVertex() {
         // 认为 task vertex variable 是一样的，都是用来存储 HugeVertex 结构
         return this == HugeType.VERTEX || this == HugeType.TASK ||
-                this == HugeType.VARIABLE || this == HugeType.SERVER;
+               this == HugeType.VARIABLE;
     }
 
     public boolean isEdge() {
         return this == EDGE || this == EDGE_OUT || this == EDGE_IN;
     }
 
+    public boolean isEdgeLabel() {
+        return this == EDGE_LABEL;
+    }
+
+
     public boolean isIndex() {
         return this == VERTEX_LABEL_INDEX || this == EDGE_LABEL_INDEX ||
-                this == SECONDARY_INDEX || this == SEARCH_INDEX ||
-                this == RANGE_INT_INDEX || this == RANGE_FLOAT_INDEX ||
-                this == RANGE_LONG_INDEX || this == RANGE_DOUBLE_INDEX ||
-                this == SHARD_INDEX || this == UNIQUE_INDEX;
+               this == SECONDARY_INDEX || this == SEARCH_INDEX ||
+               this == RANGE_INT_INDEX || this == RANGE_FLOAT_INDEX ||
+               this == RANGE_LONG_INDEX || this == RANGE_DOUBLE_INDEX ||
+               this == SHARD_INDEX || this == UNIQUE_INDEX;
+    }
+
+    public boolean isLabelIndex() {
+        return this == VERTEX_LABEL_INDEX || this == EDGE_LABEL_INDEX;
     }
 
     public boolean isStringIndex() {
         return this == VERTEX_LABEL_INDEX || this == EDGE_LABEL_INDEX ||
-                this == SECONDARY_INDEX || this == SEARCH_INDEX ||
-                this == SHARD_INDEX || this == UNIQUE_INDEX;
+               this == SECONDARY_INDEX || this == SEARCH_INDEX ||
+               this == SHARD_INDEX || this == UNIQUE_INDEX;
     }
 
     public boolean isNumericIndex() {
         return this == RANGE_INT_INDEX || this == RANGE_FLOAT_INDEX ||
-                this == RANGE_LONG_INDEX || this == RANGE_DOUBLE_INDEX ||
-                this == SHARD_INDEX;
+               this == RANGE_LONG_INDEX || this == RANGE_DOUBLE_INDEX ||
+               this == SHARD_INDEX;
     }
 
     public boolean isSecondaryIndex() {
         return this == VERTEX_LABEL_INDEX || this == EDGE_LABEL_INDEX ||
-                this == SECONDARY_INDEX;
+               this == SECONDARY_INDEX;
     }
 
     public boolean isSearchIndex() {
@@ -165,7 +171,7 @@ public enum HugeType implements SerialEnum {
 
     public boolean isRangeIndex() {
         return this == RANGE_INT_INDEX || this == RANGE_FLOAT_INDEX ||
-                this == RANGE_LONG_INDEX || this == RANGE_DOUBLE_INDEX;
+               this == RANGE_LONG_INDEX || this == RANGE_DOUBLE_INDEX;
     }
 
     public boolean isRange4Index() {
@@ -194,10 +200,14 @@ public enum HugeType implements SerialEnum {
 
     public boolean isAggregateProperty() {
         return this.isVertexAggregateProperty() ||
-                this.isEdgeAggregateProperty();
+               this.isEdgeAggregateProperty();
     }
 
-    public boolean isLabelIndex() {
-        return this == VERTEX_LABEL_INDEX || this == EDGE_LABEL_INDEX;
+    public static HugeType fromString(String type) {
+        return ALL_NAME.get(type);
+    }
+
+    public static HugeType fromCode(byte code) {
+        return SerialEnum.fromCode(HugeType.class, code);
     }
 }
