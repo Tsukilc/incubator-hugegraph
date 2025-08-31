@@ -53,7 +53,7 @@ public final class TaskManager {
     public static final String EPHEMERAL_TASK_WORKER = "ephemeral-task-worker-%d";
     public static final String DISTRIBUTED_TASK_SCHEDULER = "distributed-scheduler-%d";
 
-    protected static final long SCHEDULE_PERIOD = 1000L; // unit ms
+    static final long SCHEDULE_PERIOD = 1000L; // unit ms
     private static final long TX_CLOSE_TIMEOUT = 30L; // unit s
     private static final int THREADS = 4;
     private static final TaskManager MANAGER = new TaskManager(THREADS);
@@ -173,6 +173,10 @@ public final class TaskManager {
         if (!this.distributedSchedulerExecutor.isTerminated()) {
             this.closeDistributedSchedulerTx(graph);
         }
+    }
+
+    public void forceRemoveScheduler(HugeGraphParams params) {
+        this.schedulers.remove(params);
     }
 
     private void closeTaskTx(HugeGraphParams graph) {
@@ -379,8 +383,8 @@ public final class TaskManager {
         }
     }
 
-    protected void notifyNewTask(HugeTask<?> task) {
-        Queue<Runnable> queue = ((ThreadPoolExecutor) this.schedulerExecutor)
+    void notifyNewTask(HugeTask<?> task) {
+        Queue<Runnable> queue = this.schedulerExecutor
                 .getQueue();
         if (queue.size() <= 1) {
             /*
@@ -415,9 +419,9 @@ public final class TaskManager {
         if (scheduler instanceof StandardTaskScheduler) {
             StandardTaskScheduler standardTaskScheduler = (StandardTaskScheduler) (scheduler);
             ServerInfoManager serverManager = scheduler.serverManager();
-            String graph = scheduler.graphName();
+            String spaceGraphName = scheduler.spaceGraphName();
 
-            LockUtil.lock(graph, LockUtil.GRAPH_LOCK);
+            LockUtil.lock(spaceGraphName, LockUtil.GRAPH_LOCK);
             try {
                 /*
                  * Skip if:
@@ -460,18 +464,18 @@ public final class TaskManager {
                 // Cancel tasks scheduled to current server
                 standardTaskScheduler.cancelTasksOnWorker(serverManager.selfNodeId());
             } finally {
-                LockUtil.unlock(graph, LockUtil.GRAPH_LOCK);
+                LockUtil.unlock(spaceGraphName, LockUtil.GRAPH_LOCK);
             }
         }
     }
 
     private static final ThreadLocal<String> CONTEXTS = new ThreadLocal<>();
 
-    protected static void setContext(String context) {
+    static void setContext(String context) {
         CONTEXTS.set(context);
     }
 
-    protected static void resetContext() {
+    static void resetContext() {
         CONTEXTS.remove();
     }
 
