@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        BACKEND: [ memory, rocksdb, hbase ]
+        BACKEND: [ memory, rocksdb, hbase, hstore ]
         JAVA_VERSION: [ '11' ]
 
     steps:
@@ -69,6 +69,12 @@ jobs:
       - name: Compile
         run: |
           mvn clean compile -U -Dmaven.javadoc.skip=true -ntp
+
+      # Package is required for hstore backend
+      - name: Package (for hstore)
+        if: ${{ env.BACKEND == 'hstore' }}
+        run: |
+          mvn clean package -U -Dmaven.javadoc.skip=true -Dmaven.test.skip=true -ntp
 
       - name: Run unit test
         run: |
