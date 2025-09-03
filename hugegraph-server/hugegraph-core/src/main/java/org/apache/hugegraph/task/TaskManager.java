@@ -37,6 +37,13 @@ import org.apache.hugegraph.util.LockUtil;
 import org.apache.hugegraph.util.Log;
 import org.slf4j.Logger;
 
+/**
+ * Central task management system that coordinates task scheduling and execution.
+ * Manages task schedulers for different graphs and handles role-based execution.
+ * <p>
+ * Note: The local master-worker mechanism will be deprecated in version 1.7
+ * (configuration has been removed from config files).
+ */
 public final class TaskManager {
 
     private static final Logger LOG = Log.logger(TaskManager.class);
@@ -44,8 +51,7 @@ public final class TaskManager {
     public static final String TASK_WORKER_PREFIX = "task-worker";
     public static final String TASK_WORKER = TASK_WORKER_PREFIX + "-%d";
     public static final String TASK_DB_WORKER = "task-db-worker-%d";
-    public static final String SERVER_INFO_DB_WORKER =
-            "server-info-db-worker-%d";
+    public static final String SERVER_INFO_DB_WORKER = "server-info-db-worker-%d";
     public static final String TASK_SCHEDULER = "task-scheduler-%d";
 
     public static final String OLAP_TASK_WORKER = "olap-task-worker-%d";
@@ -87,17 +93,13 @@ public final class TaskManager {
         this.serverInfoDbExecutor = ExecutorUtil.newFixedThreadPool(
                 1, SERVER_INFO_DB_WORKER);
 
-        this.schemaTaskExecutor = ExecutorUtil.newFixedThreadPool(pool,
-                                                                  SCHEMA_TASK_WORKER);
-        this.olapTaskExecutor = ExecutorUtil.newFixedThreadPool(pool,
-                                                                OLAP_TASK_WORKER);
-        this.ephemeralTaskExecutor = ExecutorUtil.newFixedThreadPool(pool,
-                                                                     EPHEMERAL_TASK_WORKER);
+        this.schemaTaskExecutor = ExecutorUtil.newFixedThreadPool(pool, SCHEMA_TASK_WORKER);
+        this.olapTaskExecutor = ExecutorUtil.newFixedThreadPool(pool, OLAP_TASK_WORKER);
+        this.ephemeralTaskExecutor = ExecutorUtil.newFixedThreadPool(pool, EPHEMERAL_TASK_WORKER);
         this.distributedSchedulerExecutor =
-                ExecutorUtil.newPausableScheduledThreadPool(1,
-                                                            DISTRIBUTED_TASK_SCHEDULER);
+                ExecutorUtil.newPausableScheduledThreadPool(1, DISTRIBUTED_TASK_SCHEDULER);
 
-        // For schedule task to run, just one thread is ok
+        // For a schedule task to run, just one thread is ok
         this.schedulerExecutor = ExecutorUtil.newPausableScheduledThreadPool(
                 1, TASK_SCHEDULER);
         // Start after 10x period time waiting for HugeGraphServer startup
@@ -111,7 +113,9 @@ public final class TaskManager {
         E.checkArgumentNotNull(graph, "The graph can't be null");
         LOG.info("Use {} as the scheduler of graph ({})",
                  graph.schedulerType(), graph.name());
-        // TODO: If the current service is bound to a specified non-DEFAULT graph space, the graph outside of the current graph space will no longer create task schedulers (graph space)
+        // TODO: If the current service is bound to a specified non-DEFAULT graph space, the
+        //  graph outside of the current graph space will no longer create task schedulers (graph
+        //  space)
         switch (graph.schedulerType()) {
             case "distributed": {
                 TaskScheduler scheduler =
@@ -198,7 +202,7 @@ public final class TaskManager {
 
     private void closeSchedulerTx(HugeGraphParams graph) {
         final Callable<Void> closeTx = () -> {
-            // Do close-tx for current thread
+            // Do close-tx for the current thread
             graph.closeTx();
             // Let other threads run
             Thread.yield();
@@ -213,7 +217,7 @@ public final class TaskManager {
 
     private void closeDistributedSchedulerTx(HugeGraphParams graph) {
         final Callable<Void> closeTx = () -> {
-            // Do close-tx for current thread
+            // Do close-tx for the current thread
             graph.closeTx();
             // Let other threads run
             Thread.yield();
@@ -256,8 +260,7 @@ public final class TaskManager {
         if (!this.schedulerExecutor.isShutdown()) {
             this.schedulerExecutor.shutdown();
             try {
-                terminated = this.schedulerExecutor.awaitTermination(timeout,
-                                                                     unit);
+                terminated = this.schedulerExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -266,8 +269,7 @@ public final class TaskManager {
         if (terminated && !this.distributedSchedulerExecutor.isShutdown()) {
             this.distributedSchedulerExecutor.shutdown();
             try {
-                terminated = this.distributedSchedulerExecutor.awaitTermination(timeout,
-                                                                                unit);
+                terminated = this.distributedSchedulerExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -276,8 +278,7 @@ public final class TaskManager {
         if (terminated && !this.taskExecutor.isShutdown()) {
             this.taskExecutor.shutdown();
             try {
-                terminated = this.taskExecutor.awaitTermination(timeout,
-                                                                unit);
+                terminated = this.taskExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -286,8 +287,7 @@ public final class TaskManager {
         if (terminated && !this.serverInfoDbExecutor.isShutdown()) {
             this.serverInfoDbExecutor.shutdown();
             try {
-                terminated = this.serverInfoDbExecutor.awaitTermination(timeout,
-                                                                        unit);
+                terminated = this.serverInfoDbExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -296,8 +296,7 @@ public final class TaskManager {
         if (terminated && !this.taskDbExecutor.isShutdown()) {
             this.taskDbExecutor.shutdown();
             try {
-                terminated = this.taskDbExecutor.awaitTermination(timeout,
-                                                                  unit);
+                terminated = this.taskDbExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -306,8 +305,7 @@ public final class TaskManager {
         if (terminated && !this.ephemeralTaskExecutor.isShutdown()) {
             this.ephemeralTaskExecutor.shutdown();
             try {
-                terminated = this.ephemeralTaskExecutor.awaitTermination(timeout,
-                                                                         unit);
+                terminated = this.ephemeralTaskExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -316,8 +314,7 @@ public final class TaskManager {
         if (terminated && !this.schemaTaskExecutor.isShutdown()) {
             this.schemaTaskExecutor.shutdown();
             try {
-                terminated = this.schemaTaskExecutor.awaitTermination(timeout,
-                                                                      unit);
+                terminated = this.schemaTaskExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -326,8 +323,7 @@ public final class TaskManager {
         if (terminated && !this.olapTaskExecutor.isShutdown()) {
             this.olapTaskExecutor.shutdown();
             try {
-                terminated = this.olapTaskExecutor.awaitTermination(timeout,
-                                                                    unit);
+                terminated = this.olapTaskExecutor.awaitTermination(timeout, unit);
             } catch (Throwable e) {
                 ex = e;
             }
@@ -376,9 +372,12 @@ public final class TaskManager {
     public void onAsRoleWorker() {
         try {
             for (TaskScheduler entry : this.schedulers.values()) {
-                StandardTaskScheduler scheduler = (StandardTaskScheduler) entry;
-                ServerInfoManager serverInfoManager = scheduler.serverManager();
-                serverInfoManager.changeServerRole(NodeRole.WORKER);
+                ServerInfoManager serverInfoManager = entry.serverManager();
+                if (serverInfoManager != null) {
+                    serverInfoManager.changeServerRole(NodeRole.WORKER);
+                } else {
+                    LOG.warn("ServerInfoManager is null for graph {}", entry.graphName());
+                }
             }
         } catch (Throwable e) {
             LOG.error("Exception occurred when change to worker role", e);
@@ -405,10 +404,9 @@ public final class TaskManager {
         // Called by scheduler timer
         try {
             for (TaskScheduler entry : this.schedulers.values()) {
-                TaskScheduler scheduler = entry;
-                // Maybe other thread close&remove scheduler at the same time
-                synchronized (scheduler) {
-                    this.scheduleOrExecuteJobForGraph(scheduler);
+                // Maybe other threads close&remove scheduler at the same time
+                synchronized (entry) {
+                    this.scheduleOrExecuteJobForGraph(entry);
                 }
             }
         } catch (Throwable e) {
