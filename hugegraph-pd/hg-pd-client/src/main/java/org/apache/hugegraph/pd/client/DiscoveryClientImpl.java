@@ -49,6 +49,15 @@ public class DiscoveryClientImpl extends DiscoveryClient {
         registerConsumer = builder.registerConsumer;
     }
 
+    public boolean isPdReady() {
+        try {
+            this.getRegisterNode();
+        } catch (Exception e) {
+            return false;
+        }
+        return true;
+    }
+
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -78,6 +87,7 @@ public class DiscoveryClientImpl extends DiscoveryClient {
         private String appName;
         private int times;
         private Consumer registerConsumer;
+        private PDConfig conf;
 
         private Builder() {
         }
@@ -99,6 +109,11 @@ public class DiscoveryClientImpl extends DiscoveryClient {
 
         public Builder setType(RegisterType val) {
             type = val;
+            return this;
+        }
+
+        public Builder setPdConfig(PDConfig val) {
+            this.conf = val;
             return this;
         }
 
