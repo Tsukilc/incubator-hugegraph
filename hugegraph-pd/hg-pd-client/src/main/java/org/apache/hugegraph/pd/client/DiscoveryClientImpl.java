@@ -78,6 +78,7 @@ public class DiscoveryClientImpl extends DiscoveryClient {
         private String appName;
         private int times;
         private Consumer registerConsumer;
+        private PDConfig conf;
 
         private Builder() {
         }
@@ -99,6 +100,11 @@ public class DiscoveryClientImpl extends DiscoveryClient {
 
         public Builder setType(RegisterType val) {
             type = val;
+            return this;
+        }
+
+        public Builder setPdConfig(PDConfig val) {
+            this.conf = val;
             return this;
         }
 
